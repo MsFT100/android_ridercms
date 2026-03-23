@@ -1,0 +1,15 @@
+
+{
+  "@@locale": "en",
+  "motorbike": "Motorbike",
+  "mpesaPhoneNumberCannotBeEmpty": "M-Pesa phone number cannot be empty.",
+  "paymentForBucoRideVehicleRegistration": "Payment for BucoRide vehicle registration",
+  "paymentRequestSent": "A payment request was sent to your phone. Waiting for confirmation...",
+  "paymentFailed": "Payment Failed: ",
+  "subscriptionPayment": "Subscription Payment",
+  "monthlySubscription": "Monthly Subscription",
+  "subscriptionDetails": "To access ride requests, a monthly subscription is required. Your M-Pesa number is pre-filled below.",
+  "mpesaNumber": "M-Pesa Number",
+  "payWithMpesa": "Pay with M-Pesa",
+  "required": "Required"
+}
