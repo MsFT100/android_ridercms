@@ -28,7 +28,6 @@ class UserProvider extends ChangeNotifier {
 
   Future<void> _initialize() async {
     await _googleSignIn.initialize();
-
     _authStateSubscription = _auth.authStateChanges().listen(_onAuthStateChanged);
   }
 
@@ -39,17 +38,29 @@ class UserProvider extends ChangeNotifier {
       _userModel = null;
     } else {
       _firebaseUser = firebaseUser;
+      _status = Status.authenticating;
+      notifyListeners();
 
-      // Fetch profile from backend
-      final profile = await _apiService.getUserProfile();
-      if (profile != null) {
-        _userModel = profile;
+      try {
+        final profile = await _apiService.getUserProfile();
+        if (profile != null) {
+          _userModel = profile;
+          _status = Status.authenticated;
+          await _notificationService.syncToken();
+        } else {
+          await Future.delayed(const Duration(seconds: 2));
+          final retryProfile = await _apiService.getUserProfile();
+          if (retryProfile != null) {
+            _userModel = retryProfile;
+            _status = Status.authenticated;
+            await _notificationService.syncToken();
+          } else {
+            _status = Status.authenticated;
+          }
+        }
+      } catch (e) {
+        debugPrint('Profile fetch error: $e');
         _status = Status.authenticated;
-        
-        // Sync FCM token after successful authentication
-        await _notificationService.syncToken();
-      } else {
-        _status = Status.unauthenticated;
       }
     }
     notifyListeners();
@@ -114,7 +125,6 @@ class UserProvider extends ChangeNotifier {
       notifyListeners();
 
       final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-
       final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,
@@ -131,9 +141,7 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    // Clear FCM token on backend before signing out
     await _notificationService.clearToken();
-    
     await _auth.signOut();
     await _googleSignIn.signOut();
     _status = Status.unauthenticated;
@@ -142,9 +150,19 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Always gets a fresh token — mirrors your web authService
-  Future<String?> getFreshToken() async {
-    return await FirebaseAuth.instance.currentUser?.getIdToken(true);
+  Future<bool> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return true;
+    } catch (e) {
+      debugPrint('Password Reset Error: $e');
+      return false;
+    }
+  }
+
+  // FIX: Added forceRefresh parameter, default to false to avoid "Too many attempts"
+  Future<String?> getFreshToken({bool forceRefresh = false}) async {
+    return await FirebaseAuth.instance.currentUser?.getIdToken(forceRefresh);
   }
 
   @override

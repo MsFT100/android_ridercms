@@ -59,7 +59,7 @@ class SlotAssignedScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     const Text('Your Assigned Slot',
-                        style: TextStyle(color: kTextSecondary, fontSize: 13)),
+                        style: TextStyle(color: kTextSecondary, fontSize: 12)),
                     const SizedBox(height: 8),
                     Obx(() => Text(
                       controller.slotIdentifier.value,
@@ -114,73 +114,26 @@ class SlotAssignedScreen extends StatelessWidget {
                                 color: _getDoorColor(controller.doorStatus.value))),
                       )),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 24),
 
                     // Status label
                     Obx(() => Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        controller.steps[controller.step.value]['label'] as String,
+                        _getStatusLabel(controller.doorStatus.value),
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: _getStepColor(controller.step.value),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          color: _getDoorColor(controller.doorStatus.value),
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     )),
-                    const SizedBox(height: 16),
-
-                    // Progress steps
-                    ...controller.steps.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final s = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            Obx(() => AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: i <= controller.step.value
-                                    ? kPrimary
-                                    : kBgCard2,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: i < controller.step.value
-                                    ? const Icon(Icons.check,
-                                    color: Colors.white, size: 16)
-                                    : Text('${i + 1}',
-                                    style: TextStyle(
-                                        color: i <= controller.step.value
-                                            ? Colors.white
-                                            : kTextSecondary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700)),
-                              ),
-                            )),
-                            const SizedBox(width: 12),
-                            Obx(() => Text(
-                              s['label'] as String,
-                              style: TextStyle(
-                                color: i <= controller.step.value
-                                    ? kTextPrimary
-                                    : kTextSecondary,
-                                fontSize: 13,
-                              ),
-                            )),
-                          ],
-                        ),
-                      );
-                    }),
                   ],
                 ),
               ),
@@ -210,7 +163,7 @@ class SlotAssignedScreen extends StatelessWidget {
                                   fontWeight: FontWeight.w600)),
                           const SizedBox(height: 4),
                           Obx(() => Text(
-                            'Wait for the door to open, then insert your battery firmly into slot ${controller.slotIdentifier.value}. The door will close automatically once the battery is detected.',
+                            'Insert your battery firmly into slot ${controller.slotIdentifier.value}. The session will start automatically once detected.',
                             style: const TextStyle(
                                 color: kTextSecondary,
                                 fontSize: 12,
@@ -222,28 +175,24 @@ class SlotAssignedScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
 
-              // CTA / Status
+              // Bottom Actions
               Obx(() => controller.doorStatus.value == DoorStatus.closed
                   ? PrimaryButton(
-                label: 'View Charging Session →',
-                onPressed: () => Get.offAllNamed('/charging'),
-              )
+                      label: 'View Charging Session →',
+                      onPressed: () => Get.offAllNamed('/charging'),
+                    )
                   : Column(
-                children: [
-                  const CircularProgressIndicator(color: kPrimary),
-                  const SizedBox(height: 24),
-                  GhostButton(
-                    label: 'Cancel Session',
-                    onPressed: () => controller.cancelSession(),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text("Waiting for battery detection...",
-                      style:
-                      TextStyle(color: kTextSecondary, fontSize: 12)),
-                ],
-              )),
+                      children: [
+                        const CircularProgressIndicator(color: kPrimary),
+                        const SizedBox(height: 24),
+                        GhostButton(
+                          label: 'Cancel Session',
+                          onPressed: () => controller.cancelSession(),
+                        ),
+                      ],
+                    )),
               const SizedBox(height: 32),
             ],
           ),
@@ -280,9 +229,13 @@ class SlotAssignedScreen extends StatelessWidget {
     }
   }
 
-  Color _getStepColor(int step) {
-    if (step == 4) return kAccent;
-    if (step == 0 || step == 3) return kWarning;
-    return kPrimary;
+  String _getStatusLabel(DoorStatus status) {
+    switch (status) {
+      case DoorStatus.opening: return 'Opening door...';
+      case DoorStatus.open: return 'Door Open – Insert Battery';
+      case DoorStatus.insert: return 'Battery Detected';
+      case DoorStatus.closing: return 'Closing door...';
+      case DoorStatus.closed: return 'Charging Started!';
+    }
   }
 }

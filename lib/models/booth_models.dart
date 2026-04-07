@@ -115,12 +115,12 @@ class WithdrawalSession {
   factory WithdrawalSession.fromJson(Map<String, dynamic> json) {
     return WithdrawalSession(
       sessionId: json['sessionId'] ?? 0,
-      amount: (json['amount'] as num).toDouble(),
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       durationMinutes: json['durationMinutes'] ?? 0,
       soc: json['soc'] ?? 0,
       initialCharge: json['initialCharge'] ?? 0,
-      baseSwapFee: (json['baseSwapFee'] as num).toDouble(),
-      costPerChargePercent: (json['costPerChargePercent'] as num).toDouble(),
+      baseSwapFee: (json['baseSwapFee'] as num?)?.toDouble() ?? 0.0,
+      costPerChargePercent: (json['costPerChargePercent'] as num?)?.toDouble() ?? 0.0,
       depositCompletedAt: json['depositCompletedAt'] ?? '',
       pricingRules: json['pricingRules'] ?? {},
     );
@@ -146,7 +146,7 @@ class UserTransaction {
     return UserTransaction(
       id: json['id'] ?? '',
       type: json['type'] ?? '',
-      amount: (json['amount'] as num).toDouble(),
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       date: json['date'] ?? '',
       status: json['status'] ?? '',
     );

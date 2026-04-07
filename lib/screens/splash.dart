@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
+import 'package:ridercms/controllers/charging_controller.dart';
 import 'package:ridercms/controllers/permission_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
@@ -16,38 +16,54 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  // Use Get.find since it's now in InitialBinding
+  late final ChargingController chargingController;
+
   @override
   void initState() {
     super.initState();
     Get.put(PermissionController());
+    // Get the controller from InitialBinding instead of putting it here
+    chargingController = Get.find<ChargingController>();
     _checkAuth();
   }
 
   Future<void> _checkAuth() async {
-    // 1. Minimum splash time
+    // Minimum splash duration for branding
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (!mounted) return;
 
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    
-    // 2. Wait for UserProvider to finish its initialization (Firebase check)
-    // If it's still uninitialized, wait a bit longer
+
+    // Wait while Firebase is still working — covers both uninitialized AND authenticating
     int timeout = 0;
-    while (userProvider.status == Status.uninitialized && timeout < 10) {
+    while (
+    (userProvider.status == Status.uninitialized ||
+        userProvider.status == Status.authenticating) &&
+        timeout < 20 // 10 seconds max
+    ) {
       await Future.delayed(const Duration(milliseconds: 500));
       timeout++;
     }
 
+    if (!mounted) return;
+
     final prefs = await SharedPreferences.getInstance();
     final bool onboardingDone = prefs.getBool('onboarding_done') ?? false;
 
-    if (kDebugMode) {
-      print("ONBOARDING_DONE: $onboardingDone");
-    }
-    // 3. Navigation Logic
     if (userProvider.status == Status.authenticated) {
-      Get.offAllNamed('/dashboard');
+      // PROMPT FIX: Check for active session BEFORE navigating to dashboard
+      // to avoid flickering from Dashboard to Charging screen.
+      final ActiveSessionType sessionType = await chargingController.checkSessionStatus();
+      
+      if (sessionType == ActiveSessionType.payment) {
+        Get.offAllNamed('/payment');
+      } else if (sessionType == ActiveSessionType.charging) {
+        Get.offAllNamed('/charging');
+      } else {
+        Get.offAllNamed('/dashboard');
+      }
     } else {
       if (onboardingDone) {
         Get.offAllNamed('/login');

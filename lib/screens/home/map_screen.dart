@@ -119,48 +119,51 @@ class MapScreen extends StatelessWidget {
                             final booth = controller.booths[index];
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 16),
-                              child: AppCard(
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 56,
-                                      height: 56,
-                                      decoration: BoxDecoration(
-                                        color: kPrimary.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(16),
+                              child: GestureDetector(
+                                onTap: () => controller.animateToBooth(booth.latitude, booth.longitude),
+                                child: AppCard(
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 56,
+                                        height: 56,
+                                        decoration: BoxDecoration(
+                                          color: kPrimary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: const Center(child: Icon(Icons.ev_station, color: kPrimary, size: 28)),
                                       ),
-                                      child: const Center(child: Icon(Icons.ev_station, color: kPrimary, size: 28)),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            booth.name,
-                                            style: const TextStyle(color: kTextPrimary, fontSize: 15, fontWeight: FontWeight.bold),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            booth.locationAddress,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(color: kTextSecondary, fontSize: 12),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          StatusBadge(
-                                            label: '${booth.availableSlots} Slots Available',
-                                            color: booth.availableSlots > 0 ? kPrimary : kDanger,
-                                            bgColor: (booth.availableSlots > 0 ? kPrimary : kDanger).withValues(alpha: 0.1),
-                                          ),
-                                        ],
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              booth.name,
+                                              style: const TextStyle(color: kTextPrimary, fontSize: 15, fontWeight: FontWeight.bold),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              booth.locationAddress,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(color: kTextSecondary, fontSize: 12),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            StatusBadge(
+                                              label: '${booth.availableSlots} Slots Available',
+                                              color: booth.availableSlots > 0 ? kPrimary : kDanger,
+                                              bgColor: (booth.availableSlots > 0 ? kPrimary : kDanger).withValues(alpha: 0.1),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                    IconButton(
-                                      onPressed: () => controller.navigateToBooth(booth),
-                                      icon: const Icon(Icons.near_me_outlined, color: kPrimary),
-                                    ),
-                                  ],
+                                      IconButton(
+                                        onPressed: () => controller.navigateToBooth(booth),
+                                        icon: const Icon(Icons.near_me_outlined, color: kPrimary),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             );

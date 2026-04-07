@@ -138,9 +138,21 @@ class LoginScreen extends StatelessWidget {
                           const FieldLabel('Password'),
                           TextField(
                             controller: controller.passwordCtrl,
-                            obscureText: true,
+                            obscureText: controller.obscurePassword.value,
                             style: const TextStyle(color: kTextPrimary),
-                            decoration: const InputDecoration(hintText: '••••••••'),
+                            decoration: InputDecoration(
+                              hintText: '••••••••',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  controller.obscurePassword.value
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: kTextSecondary,
+                                  size: 20,
+                                ),
+                                onPressed: () => controller.togglePasswordVisibility(),
+                              ),
+                            ),
                           ),
                         ],
                       )),

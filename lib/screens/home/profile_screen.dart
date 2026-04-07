@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:get/get.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import '../../controllers/profile_controller.dart';
 import '../../providers/user_provider.dart';
+import '../../utils/enums/enums.dart';
 import '../../utils/themes/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -12,6 +15,14 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
     final user = userProvider.userModel;
+    final controller = Get.put(ProfileController());
+
+    if (userProvider.status == Status.unauthenticated || userProvider.status == Status.uninitialized) {
+      return const Scaffold(
+        backgroundColor: kBgDark,
+        body: Center(child: CircularProgressIndicator(color: kPrimary)),
+      );
+    }
 
     return Container(
       color: kBgDark,
@@ -65,7 +76,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    user?.name ?? 'User Name',
+                    user?.name ?? 'Loading...',
                     style: const TextStyle(
                       color: kTextPrimary,
                       fontSize: 20,
@@ -74,7 +85,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    user?.email ?? 'user@example.com',
+                    user?.email ?? '',
                     style: const TextStyle(
                       color: kTextSecondary,
                       fontSize: 14,
@@ -113,7 +124,9 @@ class ProfileScreen extends StatelessWidget {
                   _buildOptionTile(
                     icon: Icons.history,
                     label: "Transaction History",
-                    onTap: () {},
+                    onTap: () {
+                      Get.toNamed('/history');
+                    },
                   ),
                   const SizedBox(height: 32),
                   const Text(
@@ -147,10 +160,7 @@ class ProfileScreen extends StatelessWidget {
                   AppCard(
                     padding: EdgeInsets.zero,
                     child: ListTile(
-                      onTap: () async {
-                        await userProvider.signOut();
-                        Get.offAllNamed('/login');
-                      },
+                      onTap: () => controller.showLogoutConfirmation(context),
                       leading: const Icon(Icons.logout, color: kDanger),
                       title: const Text(
                         "Logout",
@@ -159,6 +169,43 @@ class ProfileScreen extends StatelessWidget {
                       trailing: const Icon(Icons.chevron_right, color: kTextSecondary),
                     ),
                   ),
+                  const SizedBox(height: 32),
+
+                  // Development Version Tracking
+                  FutureBuilder<PackageInfo>(
+                    future: PackageInfo.fromPlatform(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData) {
+                        final info = snapshot.data!;
+                        return Center(
+                          child: Column(
+                            children: [
+                              Text(
+                                "VERSION ${info.version} (${info.buildNumber})",
+                                style: TextStyle(
+                                  color: kTextSecondary.withValues(alpha: 0.5),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "RIDERCMS DEVELOPMENT",
+                                style: TextStyle(
+                                  color: kTextSecondary.withValues(alpha: 0.3),
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+
                   const SizedBox(height: 120), // Space for bottom nav
                 ],
               ),

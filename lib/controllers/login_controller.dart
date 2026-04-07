@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
+import 'package:ridercms/utils/enums/enums.dart';
 import '../providers/user_provider.dart';
 import '../widgets/custom_snackbar.dart';
 
@@ -11,9 +12,14 @@ class LoginController extends GetxController {
   final phoneCtrl = TextEditingController();
 
   var isLogin = true.obs;
+  var obscurePassword = true.obs; // Add this for password visibility
 
   void toggleMode() {
     isLogin.value = !isLogin.value;
+  }
+
+  void togglePasswordVisibility() {
+    obscurePassword.value = !obscurePassword.value;
   }
 
   Future<void> submit(BuildContext context) async {
@@ -28,8 +34,8 @@ class LoginController extends GetxController {
       if (!context.mounted) return;
 
       if (success) {
+        CustomSnackBar.show(context, 'Welcome back!', isError: false);
         Get.offAllNamed('/dashboard');
-        CustomSnackBar.show(context, 'Welcome', isError: false);
       } else {
         CustomSnackBar.show(context, 'Login failed. Please check your credentials.', isError: true);
       }
@@ -60,7 +66,39 @@ class LoginController extends GetxController {
     if (!context.mounted) return;
 
     if (success) {
+      CustomSnackBar.show(context, 'Signed in with Google', isError: false);
       Get.offAllNamed('/dashboard');
+    } else {
+      if (userProvider.status == Status.unauthenticated) {
+         CustomSnackBar.show(context, 'Google sign-in failed or cancelled.', isError: true);
+      }
+    }
+  }
+
+  Future<void> forgotPassword(BuildContext context) async {
+    final email = emailCtrl.text.trim();
+    if (email.isEmpty || !GetUtils.isEmail(email)) {
+      CustomSnackBar.show(context, 'Please enter a valid email address first.', isError: true);
+      return;
+    }
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    bool success = await userProvider.sendPasswordResetEmail(email);
+
+    if (!context.mounted) return;
+
+    if (success) {
+      CustomSnackBar.show(
+        context, 
+        'Password reset email sent. Please check your inbox.', 
+        isError: false
+      );
+    } else {
+      CustomSnackBar.show(
+        context, 
+        'Failed to send reset email. Make sure the email is registered.', 
+        isError: true
+      );
     }
   }
 

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -17,7 +16,6 @@ class ScanController extends GetxController {
 
   final TextEditingController manualIdController = TextEditingController();
 
-  // test booth 672a4e90-146b-4fbb-a48d-ec768f28dd70
   Future<void> handleQrCode(BuildContext context, String code) async {
     if (isProcessing.value) return;
 
@@ -27,25 +25,44 @@ class ScanController extends GetxController {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       final token = await userProvider.getFreshToken();
 
-      if (kDebugMode) {
-        print("QR TOKEN USED: $token ");
-      }
-
       if (token == null) {
         throw 'Authentication token not found. Please log in again.';
       }
 
-      final result = await _boothService.initiateDeposit(token, code);
+      // We need to determine if this is a DEPOSIT scan or a RELEASE scan.
+      // We can check if the user came from the PaymentSuccessScreen or has a pending withdrawal.
+      // For now, let's try 'releaseBattery' first if they have a paid session, 
+      // otherwise fallback to 'initiateDeposit'.
+      
+      // Attempt to release battery first (for paid withdrawals)
+      final releaseResult = await _boothService.releaseBattery(token, code);
 
-      // Check for backend error response
-      if (result.containsKey('error')) {
-        throw result['error'];
+      if (releaseResult['success'] == true) {
+        if (context.mounted) {
+          CustomSnackBar.show(context, releaseResult['message']);
+          // Redirect to a specific collection/success screen or dashboard
+          Get.offAllNamed('/dashboard'); 
+        }
+        return;
       }
 
-      if (context.mounted) {
-        CustomSnackBar.show(context, 'Deposit initiated! Proceed to slot ${result['slotIdentifier']}');
-        Get.offNamed('/slot-assigned', arguments: result);
+      // If release fails with 404 (No paid session), then it might be a normal DEPOSIT scan.
+      if (releaseResult['message'].toString().contains('No paid withdrawal session')) {
+         final depositResult = await _boothService.initiateDeposit(token, code);
+
+         if (depositResult.containsKey('error')) {
+           throw depositResult['error'];
+         }
+
+         if (context.mounted) {
+           CustomSnackBar.show(context, 'Deposit initiated! Proceed to slot ${depositResult['slotIdentifier']}');
+           Get.offNamed('/slot-assigned', arguments: depositResult);
+         }
+      } else {
+        // Some other error from releaseBattery
+        throw releaseResult['message'];
       }
+
     } catch (e) {
       if (context.mounted) {
         CustomSnackBar.show(context, '$e', isError: true);
@@ -109,7 +126,6 @@ class ScanController extends GetxController {
                 : () {
                     final id = manualIdController.text.trim();
                     if (id.isNotEmpty) {
-
                       handleQrCode(context, id);
                     }
                   },

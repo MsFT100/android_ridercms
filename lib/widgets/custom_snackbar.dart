@@ -3,6 +3,9 @@ import '../utils/themes/app_theme.dart';
 
 class CustomSnackBar {
   static void show(BuildContext context, String info, {bool isError = false}) {
+    // Clear any existing snackbars to prevent queuing or "stuck" snackbars
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         elevation: 0,

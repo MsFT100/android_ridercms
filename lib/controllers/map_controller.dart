@@ -112,6 +112,15 @@ class MapController extends GetxController {
     mapController = controller;
   }
 
+  void animateToBooth(double lat, double lng) {
+    mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(lat, lng),
+        16, // Zoom in closer
+      ),
+    );
+  }
+
   Future<void> navigateToBooth(PublicBooth booth) async {
     final lat = booth.latitude;
     final lng = booth.longitude;

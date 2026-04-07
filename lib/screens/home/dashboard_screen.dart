@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:get/get_core/src/get_main.dart';
-import 'package:get/get_navigation/src/extension_navigation.dart';
+import 'package:get/get.dart';
 import 'package:provider/provider.dart';
+import 'package:ridercms/controllers/charging_controller.dart';
 import 'package:ridercms/providers/app_provider.dart';
 import 'package:ridercms/providers/notification_provider.dart';
 import 'package:ridercms/providers/user_provider.dart';
@@ -14,13 +14,25 @@ import '../../widgets/home/quick_action.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good morning';
+    } else if (hour < 17) {
+      return 'Good afternoon';
+    } else {
+      return 'Good evening';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 1. Watch the UserProvider for changes
     final userProvider = context.watch<UserProvider>();
     final appProvider = context.read<AppProvider>();
     final notificationProvider = context.watch<NotificationProvider>();
-    
+    final chargingController = Get.find<ChargingController>();
+
     final userName = userProvider.firebaseUser?.displayName ?? 'RiderCMS';
     final unreadCount = notificationProvider.unreadCount;
 
@@ -54,7 +66,7 @@ class DashboardScreen extends StatelessWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Good morning', style: TextStyle(color: kTextSecondary, fontSize: 13)),
+                              Text(_getGreeting(), style: const TextStyle(color: kTextSecondary, fontSize: 13)),
                               const SizedBox(height: 4),
                               Text(
                                 userName.toUpperCase(),
@@ -150,13 +162,19 @@ class DashboardScreen extends StatelessWidget {
                             onTap: () => appProvider.setIndex(1),
                           ),
 
-                          QuickAction(
-                            icon: Icons.qr_code_scanner,
-                            title: "Scan Battery",
-                            subtitle: "Start charging now",
-                            gradient: const [Color(0xFF1a2a1a), Color(0xFF1e4a2a)],
-                            onTap: () => Get.to(ScanScreen()),
-                          ),
+                          Obx(() {
+                            final bool hasSession = chargingController.hasActiveSession();
+                            return QuickAction(
+                              icon: Icons.qr_code_scanner,
+                              title: "Scan Battery",
+                              subtitle: hasSession ? "Session active" : "Start charging now",
+                              gradient: const [Color(0xFF1a2a1a), Color(0xFF1e4a2a)],
+                              opacity: hasSession ? 0.5 : 1.0,
+                              onTap: hasSession 
+                                ? () => Get.snackbar('Action Disabled', 'You already have an active session.') 
+                                : () => Get.to(ScanScreen()),
+                            );
+                          }),
 
                           QuickAction(
                             icon: Icons.bolt,

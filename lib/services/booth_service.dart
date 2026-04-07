@@ -87,6 +87,27 @@ class BoothService {
     }
   }
 
+  /// Fetches details of a user's pending withdrawal session, if one exists.
+  /// GET /api/booths/sessions/pending-withdrawal
+  Future<WithdrawalSession?> getPendingWithdrawal(String token) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/booths/sessions/pending-withdrawal'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data == null || (data is Map && data.isEmpty)) return null;
+        return WithdrawalSession.fromJson(data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching pending withdrawal: $e');
+      return null;
+    }
+  }
+
   /// Initiates the withdrawal process.
   Future<WithdrawalSession?> initiateWithdrawal(String token) async {
     try {
@@ -94,11 +115,27 @@ class BoothService {
         Uri.parse('$_baseUrl/booths/initiate-withdrawal'),
         headers: {'Authorization': 'Bearer $token'},
       );
+      
+      if (kDebugMode) {
+        print('Initiate Withdrawal RAW Response: ${response.body}');
+      }
+
       if (response.statusCode == 200) {
         return WithdrawalSession.fromJson(json.decode(response.body));
+      } else {
+        // PROMPT FIX: Throw actual error message from backend
+        Map<String, dynamic> errorData = {};
+        try {
+          errorData = json.decode(response.body);
+        } catch (_) {}
+        
+        final errorMessage = errorData['error'] ?? errorData['message'] ?? 'Failed to initiate withdrawal (Status: ${response.statusCode})';
+        throw errorMessage;
       }
-      return null;
     } catch (e) {
+      if (kDebugMode) {
+        print('Error in initiateWithdrawal: $e');
+      }
       rethrow;
     }
   }
@@ -145,6 +182,29 @@ class BoothService {
       );
     } catch (e) {
       rethrow;
+    }
+  }
+
+  /// Release battery after scanning booth QR
+  Future<Map<String, dynamic>> releaseBattery(String token, String boothUid) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/booths/release-battery'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({'boothUid': boothUid}),
+      );
+
+      final data = json.decode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message'], 'slotIdentifier': data['slotIdentifier']};
+      } else {
+        return {'success': false, 'message': data['error'] ?? 'Failed to release battery'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
@@ -10,28 +11,21 @@ enum DoorStatus { opening, open, insert, closing, closed }
 
 class SlotAssignedController extends GetxController {
   final BoothService _boothService = BoothService();
-  
+  final FirebaseDatabase _db = FirebaseDatabase.instance;
+
   var doorStatus = DoorStatus.opening.obs;
-  var step = 0.obs;
   var slotIdentifier = '---'.obs;
   var boothName = 'Station'.obs;
-  
-  Timer? _pollingTimer;
+  var boothUid = ''.obs;
 
-  final steps = const [
-    {'label': 'Opening door...', 'icon': Icons.lock_open},
-    {'label': 'Door Open – Insert Battery', 'icon': Icons.door_front_door},
-    {'label': 'Battery Inserted', 'icon': Icons.battery_full},
-    {'label': 'Closing door...', 'icon': Icons.lock},
-    {'label': 'Door Closed – Charging Started', 'icon': Icons.bolt},
-  ];
+  StreamSubscription? _statusSubscription;
+  Timer? _pollingTimer;
 
   @override
   void onInit() {
     super.onInit();
     final dynamic args = Get.arguments;
     
-    // Support nested slot structure from backend response
     if (args != null) {
       if (args['slotIdentifier'] != null) {
         slotIdentifier.value = args['slotIdentifier'].toString();
@@ -40,53 +34,81 @@ class SlotAssignedController extends GetxController {
       }
       
       boothName.value = args['boothName'] ?? 'Station';
+      boothUid.value = args['boothUid'] ?? '';
     }
 
-    // UI sequence simulation for visuals
-    _simulateSequence();
+    // UI sequence simulation for initial visuals
+    _simulateOpening();
+
+    // Start Realtime Database listener
+    if (boothUid.value.isNotEmpty && slotIdentifier.value != '---') {
+      _startFirebaseListener();
+    }
     
-    // Start real polling for backend confirmation
+    // Fallback polling
     _startPolling();
   }
 
-  void _simulateSequence() {
+  void _simulateOpening() {
     Future.delayed(const Duration(seconds: 2), () {
       if (doorStatus.value == DoorStatus.opening) {
         doorStatus.value = DoorStatus.open;
-        step.value = 1;
+      }
+    });
+  }
+
+  void _startFirebaseListener() {
+    final ref = _db.ref('booths/${boothUid.value}/slots/${slotIdentifier.value}');
+    
+    _statusSubscription = ref.onValue.listen((event) {
+      final data = event.snapshot.value;
+      if (data == null || data is! Map) return;
+
+      final bool doorLocked = data['doorLocked'] ?? data['locked'] ?? false;
+      final bool batteryInserted = data['batteryInserted'] ?? data['present'] ?? false;
+
+      if (batteryInserted && doorLocked) {
+        _onSequenceComplete();
+      } else if (batteryInserted) {
+        doorStatus.value = DoorStatus.insert;
+      } else if (!doorLocked) {
+        doorStatus.value = DoorStatus.open;
       }
     });
   }
 
   void _startPolling() {
-    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       final BuildContext? context = Get.context;
       if (context == null) return;
-      
+
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      
+
       try {
         final token = await userProvider.getFreshToken();
         if (token == null) return;
 
         final status = await _boothService.getMyBatteryStatus(token);
 
-        if (kDebugMode) {
-          print("Polled Status: ${status?.sessionStatus}");
-        }
-        
         if (status != null && status.sessionStatus != 'pending') {
-          _pollingTimer?.cancel();
-          
-          doorStatus.value = DoorStatus.closed;
-          step.value = 4;
-          
-          Future.delayed(const Duration(seconds: 1), () {
-            Get.offAllNamed('/charging');
-          });
+          _onSequenceComplete();
         }
       } catch (e) {
         if (kDebugMode) print("Polling error: $e");
+      }
+    });
+  }
+
+  void _onSequenceComplete() {
+    _pollingTimer?.cancel();
+    _statusSubscription?.cancel();
+    
+    doorStatus.value = DoorStatus.closed;
+
+    // Navigate to charging screen after a short delay
+    Future.delayed(const Duration(seconds: 1), () {
+      if (Get.currentRoute == '/slot-assigned') {
+        Get.offAllNamed('/charging');
       }
     });
   }
@@ -103,6 +125,7 @@ class SlotAssignedController extends GetxController {
       
       await _boothService.cancelActiveSession(token);
       _pollingTimer?.cancel();
+      _statusSubscription?.cancel();
       Get.offAllNamed('/dashboard');
     } catch (e) {
       Get.snackbar('Error', 'Failed to cancel session: $e', 
@@ -116,6 +139,7 @@ class SlotAssignedController extends GetxController {
   @override
   void onClose() {
     _pollingTimer?.cancel();
+    _statusSubscription?.cancel();
     super.onClose();
   }
 }

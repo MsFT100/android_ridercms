@@ -1,9 +1,15 @@
+// ignore_for_file: unused_import
+
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
+import 'package:ridercms/controllers/charging_controller.dart';
+import 'package:ridercms/middleware/session_middleware.dart';
 import 'package:ridercms/providers/notification_provider.dart';
 import 'package:ridercms/screens/auth/reset_password_screen.dart';
 import 'package:ridercms/screens/home/history_screen.dart';
@@ -20,6 +26,10 @@ import 'package:ridercms/screens/home/map_screen.dart';
 import 'package:ridercms/screens/home/charging_screen.dart';
 import 'package:ridercms/screens/home/session_complete_screen.dart';
 import 'package:ridercms/screens/home/slot_assigned_screen.dart';
+import 'package:ridercms/screens/payment/payment_processing_screen.dart';
+import 'package:ridercms/screens/payment/payment_screen.dart';
+import 'package:ridercms/screens/payment/payment_success_screen.dart';
+import 'package:ridercms/screens/payment/payment_failed_screen.dart';
 import 'package:ridercms/services/notification_service.dart';
 import 'package:ridercms/utils/constants/app_constants.dart';
 import 'package:ridercms/utils/themes/app_theme.dart';
@@ -60,10 +70,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
+class InitialBinding extends Bindings {
+  @override
+  void dependencies() {
+    Get.lazyPut(() => ChargingController(), fenix: true);
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp();
+
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: kDebugMode
+        ? AndroidProvider.debug
+        : AndroidProvider.playIntegrity,
+  );
 
   const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
   const InitializationSettings initSettings = InitializationSettings(android: androidSettings);
@@ -89,6 +112,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: GetMaterialApp(
+        initialBinding: InitialBinding(),
         navigatorKey: NotificationService.navigatorKey,
         debugShowCheckedModeBanner: false,
         title: AppConstants.appName,
@@ -99,6 +123,7 @@ class MyApp extends StatelessWidget {
           GetPage(name: '/', page: () => const SplashScreen()),
           GetPage(name: '/onboarding', page: () => const OnboardingScreen()),
           GetPage(name: '/login', page: () => const LoginScreen()),
+          // Removed SessionMiddleware to allow manual navigation between Dashboard and Charging
           GetPage(name: '/dashboard', page: () => const MainScreen()),
           GetPage(name: '/map', page: () => const MapScreen()),
           GetPage(name: '/slot-assigned', page: () => const SlotAssignedScreen()),
@@ -108,6 +133,10 @@ class MyApp extends StatelessWidget {
           GetPage(name: '/history', page: () => const HistoryScreen()),
           GetPage(name: '/privacy-policy', page: () => const PrivacyPolicyScreen()),
           GetPage(name: '/terms-of-service', page: () => const TermsOfServiceScreen()),
+          GetPage(name: '/payment', page: () => const PaymentScreen()),
+          GetPage(name: '/payment-processing', page: () => const PaymentProcessingScreen()),
+          GetPage(name: '/payment-success', page: () => const PaymentSuccessScreen()),
+          GetPage(name: '/payment-failed', page: () => const PaymentFailedScreen()),
         ],
       ),
     );

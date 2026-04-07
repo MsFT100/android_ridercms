@@ -75,12 +75,13 @@ class AppCard extends StatelessWidget {
 
 /// Back button (rounded square)
 class BackBtn extends StatelessWidget {
-  const BackBtn({super.key});
+  final VoidCallback? onTap;
+  const BackBtn({super.key, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.pop(context),
+      onTap: onTap ?? () => Navigator.pop(context),
       child: Container(
         width: 40,
         height: 40,

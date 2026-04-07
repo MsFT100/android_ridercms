@@ -1,40 +1,49 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:ridercms/widgets/common_widgets.dart';
+import '../../models/booth_models.dart';
+import '../../services/booth_service.dart';
+import '../../utils/themes/app_theme.dart';
 
 class PaymentProcessingScreen extends StatefulWidget {
   const PaymentProcessingScreen({super.key});
 
   @override
-  State<PaymentProcessingScreen> createState() =>
-      _PaymentProcessingScreenState();
+  State<PaymentProcessingScreen> createState() => _PaymentProcessingScreenState();
 }
 
 class _Step {
   final String label;
   final int durationMs;
-
   const _Step({required this.label, required this.durationMs});
 }
 
 const List<_Step> _steps = [
   _Step(label: 'Connecting to M-Pesa...', durationMs: 1500),
-  _Step(label: 'Sending payment prompt...', durationMs: 2000),
-  _Step(label: 'Waiting for confirmation...', durationMs: 2500),
-  _Step(label: 'Verifying transaction...', durationMs: 1500),
-  _Step(label: 'Payment confirmed!', durationMs: 1000),
+  _Step(label: 'Waiting for PIN entry...', durationMs: 5000),
+  _Step(label: 'Verifying transaction...', durationMs: 2500),
+  _Step(label: 'Finalizing session...', durationMs: 1500),
 ];
 
 class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
     with SingleTickerProviderStateMixin {
+  final BoothService _boothService = BoothService();
   int _currentStep = 0;
-  bool _done = false;
-
-  final List<Timer> _timers = [];
+  bool _isFinalizing = false;
+  Timer? _pollingTimer;
   late AnimationController _pulseController;
+
+  late final String checkoutRequestId;
+  late final WithdrawalSession session;
+  late final String token;
 
   @override
   void initState() {
     super.initState();
+    checkoutRequestId = Get.arguments['checkoutRequestId'];
+    session = Get.arguments['session'];
+    token = Get.arguments['token'];
 
     _pulseController = AnimationController(
       vsync: this,
@@ -43,57 +52,72 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
       upperBound: 1.2,
     )..repeat(reverse: true);
 
+    _startProgressAnimation();
+    _startPolling();
+  }
+
+  void _startProgressAnimation() {
     int total = 0;
-
     for (int i = 0; i < _steps.length; i++) {
-      final idx = i;
-
-      _timers.add(
-        Timer(Duration(milliseconds: total), () {
-          if (!mounted) return;
-
-          setState(() {
-            _currentStep = idx;
-          });
-
-          if (idx == _steps.length - 1) {
-            _finishProcess();
-          }
-        }),
-      );
-
+      Future.delayed(Duration(milliseconds: total), () {
+        if (mounted && _currentStep < i) {
+          setState(() => _currentStep = i);
+        }
+      });
       total += _steps[i].durationMs;
     }
   }
 
-  void _finishProcess() {
-    _timers.add(
-      Timer(const Duration(milliseconds: 800), () {
-        if (!mounted) return;
+  void _startPolling() {
+    int attempts = 0;
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      attempts++;
+      if (attempts > 30) { // 90 seconds timeout
+        _handleFailure('Payment timed out. Please check your M-Pesa.');
+        return;
+      }
 
-        setState(() {
-          _done = true;
-        });
+      try {
+        final status = await _boothService.getWithdrawalStatus(token, checkoutRequestId);
+        final normalizedStatus = status.toLowerCase();
+        
+        debugPrint('M-Pesa Status Received: $normalizedStatus');
 
-        _pulseController.stop();
+        // Added 'paid' to support your backend's specific status string
+        if (normalizedStatus == 'completed' || normalizedStatus == 'success' || normalizedStatus == 'paid') {
+          _handleSuccess();
+        } else if (normalizedStatus == 'failed' || normalizedStatus == 'cancelled') {
+          _handleFailure('M-Pesa transaction was cancelled or failed.');
+        }
+      } catch (e) {
+        debugPrint('Polling Error: $e');
+        // Silently continue polling
+      }
+    });
+  }
 
-        _timers.add(
-          Timer(const Duration(milliseconds: 800), () {
-            if (!mounted) return;
+  void _handleSuccess() {
+    _pollingTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _isFinalizing = true);
+    
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      Get.offNamed('/payment-success', arguments: {
+        'session': session,
+        'checkoutRequestId': checkoutRequestId,
+      });
+    });
+  }
 
-            Navigator.pushReplacementNamed(context, '/payment-success');
-          }),
-        );
-      }),
-    );
+  void _handleFailure(String error) {
+    _pollingTimer?.cancel();
+    if (!mounted) return;
+    Get.offNamed('/payment-failed', arguments: {'error': error});
   }
 
   @override
   void dispose() {
-    for (final t in _timers) {
-      t.cancel();
-    }
-
+    _pollingTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -101,186 +125,104 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: kBgDark,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                /// Animated Circle
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    if (!_done)
-                      ScaleTransition(
-                        scale: _pulseController,
-                        child: Container(
-                          width: 128,
-                          height: 128,
-                          decoration: const BoxDecoration(
-                            color: Color(0x22FFFFFF),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 500),
-                      width: 128,
-                      height: 128,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  ScaleTransition(
+                    scale: _pulseController,
+                    child: Container(
+                      width: 140,
+                      height: 140,
                       decoration: BoxDecoration(
-                        color: _done ? Colors.green : const Color(0xFF1E1E1E),
+                        color: kPrimary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white24,
-                          width: 3,
-                        ),
-                      ),
-                      child: Center(
-                        child: _done
-                            ? const Text(
-                          "✓",
-                          style: TextStyle(
-                            fontSize: 48,
-                            color: Colors.white,
-                          ),
-                        )
-                            : const CircularProgressIndicator(
-                          color: Colors.green,
-                          strokeWidth: 3,
-                        ),
                       ),
                     ),
-                  ],
-                ),
-
-                const SizedBox(height: 30),
-
-                /// Title
-                Text(
-                  _done ? "Payment Successful!" : "Processing Payment",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
                   ),
-                ),
-
-                const SizedBox(height: 10),
-
-                const Text(
-                  "Please do not close this screen",
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 40),
-
-                /// Steps
-                ..._steps.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final step = entry.value;
-
-                  final isCompleted = i < _currentStep || _done;
-                  final isCurrent = i == _currentStep && !_done;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: isCompleted
-                                ? Colors.green
-                                : isCurrent
-                                ? Colors.greenAccent
-                                : Colors.grey,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              isCompleted
-                                  ? "✓"
-                                  : isCurrent
-                                  ? "•"
-                                  : "${i + 1}",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        Expanded(
-                          child: Text(
-                            step.label,
-                            style: TextStyle(
-                              color: isCompleted
-                                  ? Colors.green
-                                  : isCurrent
-                                  ? Colors.white
-                                  : Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ],
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: kBgCard,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: kPrimary.withValues(alpha: 0.3), width: 2),
                     ),
-                  );
-                }),
-
-                const SizedBox(height: 40),
-
-                /// Amount Card
-                Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(16),
+                    child: const Center(
+                      child: CircularProgressIndicator(color: kPrimary, strokeWidth: 3),
+                    ),
                   ),
-                  child: const Column(
+                ],
+              ),
+              const SizedBox(height: 40),
+              Text(
+                _isFinalizing ? "Finalizing Transaction" : "Processing Payment",
+                style: const TextStyle(color: kTextPrimary, fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Please wait while your payment is being processed.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: kTextSecondary, fontSize: 15),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Please do not close this screen or go back",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: kTextSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 48),
+              // Steps
+              ..._steps.asMap().entries.map((entry) {
+                final i = entry.key;
+                final step = entry.value;
+                final isCompleted = i < _currentStep || _isFinalizing;
+                final isCurrent = i == _currentStep && !_isFinalizing;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Row(
                     children: [
-                      Text(
-                        "Amount",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
+                      Icon(
+                        isCompleted ? Icons.check_circle : Icons.radio_button_checked,
+                        color: isCompleted ? kPrimary : (isCurrent ? kPrimary : kTextSecondary.withValues(alpha: 0.3)),
+                        size: 20,
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(width: 16),
                       Text(
-                        "KSh 284",
+                        step.label,
                         style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        "via M-Pesa",
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
+                          color: isCompleted || isCurrent ? kTextPrimary : kTextSecondary.withValues(alpha: 0.5),
+                          fontSize: 15,
+                          fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
+                );
+              }),
+              const Spacer(),
+              // Amount Info
+              AppCard(
+                child: Column(
+                  children: [
+                    const Text("Amount to be paid", style: TextStyle(color: kTextSecondary, fontSize: 12)),
+                    const SizedBox(height: 8),
+                    Text(
+                      "KSh ${session.amount}",
+                      style: const TextStyle(color: kPrimary, fontSize: 32, fontWeight: FontWeight.w900),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
         ),
       ),
