@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:ridercms/utils/themes/app_theme.dart';
-import '../../widgets/common_widgets.dart';
+import '../../controllers/charging_controller.dart';
 
 class ChargingStopWaitScreen extends StatefulWidget {
   const ChargingStopWaitScreen({super.key});
@@ -35,14 +35,15 @@ class _ChargingStopWaitScreenState extends State<ChargingStopWaitScreen> with Si
         setState(() => _secondsRemaining--);
       } else {
         _timer?.cancel();
-        _navigateToPayment();
+        _initiateWithdrawal();
       }
     });
   }
 
-  void _navigateToPayment() {
-    // Automatically proceed to payment screen
-    Get.offNamed('/payment');
+  void _initiateWithdrawal() {
+    // Call the controller to handle backend withdrawal initiation
+    final controller = Get.find<ChargingController>();
+    controller.startWithdrawal();
   }
 
   @override

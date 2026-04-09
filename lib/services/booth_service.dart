@@ -6,6 +6,7 @@ import '../models/booth_models.dart';
 
 class BoothService {
   final String _baseUrl = AppConfig.baseUrl;
+  final Duration _timeout = const Duration(seconds: 15);
 
   /// Fetches a list of all public, online booths.
   Future<List<PublicBooth>> getBooths(String token) async {
@@ -15,19 +16,15 @@ class BoothService {
         headers: {
           'Authorization': 'Bearer $token',
         },
-      );
-      if (kDebugMode) {
-        print('Booths RAW Response: ${response.body}');
-      }
+      ).timeout(_timeout);
+      
       if (response.statusCode == 200) {
         List<dynamic> data = json.decode(response.body);
         return data.map((json) => PublicBooth.fromJson(json)).toList();
       }
       return [];
     } catch (e) {
-      if (kDebugMode) {
-        print('Failed to fetch public booths: $e');
-      }
+      debugPrint('Failed to fetch public booths: $e');
       rethrow;
     }
   }
@@ -42,17 +39,11 @@ class BoothService {
           'Content-Type': 'application/json',
         },
         body: json.encode({'boothUid': boothUid}),
-      );
+      ).timeout(_timeout);
       
-      final data = json.decode(response.body);
-      if (kDebugMode) {
-        print('Initiate Deposit RAW Response: ${response.body}');
-      }
-      return data;
+      return json.decode(response.body);
     } catch (e) {
-      if (kDebugMode) {
-        print('Failed to initiate deposit: $e');
-      }
+      debugPrint('Failed to initiate deposit: $e');
       rethrow;
     }
   }
@@ -63,7 +54,7 @@ class BoothService {
       final response = await http.get(
         Uri.parse('$_baseUrl/booths/my-battery-status'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(_timeout);
       
       if (kDebugMode) {
         print('My Battery Status RAW Response: ${response.body}');
@@ -74,27 +65,23 @@ class BoothService {
         if (data == null) return null;
         return MyBatteryStatus.fromJson(data);
       } else {
-        if (kDebugMode) {
-          print('Status Polling Failed: ${response.statusCode} - ${response.body}');
-        }
+        debugPrint('Status Polling Failed: ${response.statusCode} - ${response.body}');
         return null;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Polling error in service: $e');
-      }
-      rethrow;
+      debugPrint('Polling error in service: $e');
+      // Return null instead of rethrowing to allow the app to keep polling
+      return null;
     }
   }
 
   /// Fetches details of a user's pending withdrawal session, if one exists.
-  /// GET /api/booths/sessions/pending-withdrawal
   Future<WithdrawalSession?> getPendingWithdrawal(String token) async {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/booths/sessions/pending-withdrawal'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(_timeout);
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -108,34 +95,47 @@ class BoothService {
     }
   }
 
+  /// Stop charging before withdrawal
+  Future<Map<String, dynamic>> stopCharging(String token) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/booths/stop-charging'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(_timeout);
+      
+      final data = json.decode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 409) {
+        return data;
+      } else {
+        throw data['error'] ?? data['message'] ?? 'Failed to stop charging';
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   /// Initiates the withdrawal process.
   Future<WithdrawalSession?> initiateWithdrawal(String token) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/booths/initiate-withdrawal'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(_timeout);
       
-      if (kDebugMode) {
-        print('Initiate Withdrawal RAW Response: ${response.body}');
-      }
-
       if (response.statusCode == 200) {
         return WithdrawalSession.fromJson(json.decode(response.body));
       } else {
-        // PROMPT FIX: Throw actual error message from backend
         Map<String, dynamic> errorData = {};
         try {
           errorData = json.decode(response.body);
         } catch (_) {}
-        
         final errorMessage = errorData['error'] ?? errorData['message'] ?? 'Failed to initiate withdrawal (Status: ${response.statusCode})';
         throw errorMessage;
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error in initiateWithdrawal: $e');
-      }
       rethrow;
     }
   }
@@ -146,7 +146,7 @@ class BoothService {
       final response = await http.post(
         Uri.parse('$_baseUrl/booths/sessions/$sessionId/pay'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(_timeout);
       if (response.statusCode == 200) {
         return json.decode(response.body)['checkoutRequestId'];
       }
@@ -162,7 +162,7 @@ class BoothService {
       final response = await http.get(
         Uri.parse('$_baseUrl/booths/withdrawal-status/$checkoutRequestId'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(_timeout);
       return json.decode(response.body)['paymentStatus'];
     } catch (e) {
       rethrow;
@@ -179,7 +179,7 @@ class BoothService {
           'Content-Type': 'application/json',
         },
         body: json.encode({'checkoutRequestId': checkoutRequestId}),
-      );
+      ).timeout(_timeout);
     } catch (e) {
       rethrow;
     }
@@ -195,7 +195,7 @@ class BoothService {
           'Content-Type': 'application/json',
         },
         body: json.encode({'boothUid': boothUid}),
-      );
+      ).timeout(_timeout);
 
       final data = json.decode(response.body);
       if (response.statusCode == 200) {
@@ -214,7 +214,7 @@ class BoothService {
       final response = await http.get(
         Uri.parse('$_baseUrl/booths/history'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(_timeout);
       if (response.statusCode == 200) {
         List<dynamic> data = json.decode(response.body);
         return data.map((json) => UserTransaction.fromJson(json)).toList();
@@ -231,7 +231,7 @@ class BoothService {
       await http.post(
         Uri.parse('$_baseUrl/booths/cancel-session'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(_timeout);
     } catch (e) {
       rethrow;
     }

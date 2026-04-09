@@ -29,6 +29,8 @@ class ChargingController extends GetxController {
   void onInit() {
     super.onInit();
     _startElapsedTimer();
+    // Start fetching status immediately when controller is initialized
+    checkSessionStatus();
   }
 
   void _startElapsedTimer() {
@@ -42,22 +44,22 @@ class ChargingController extends GetxController {
     isLoading.value = true;
     String? token = manualToken;
     
-    if (token == null) {
-      final BuildContext? context = Get.context;
-      if (context == null) {
+    try {
+      if (token == null) {
+        final BuildContext? context = Get.context;
+        if (context == null) {
+          isLoading.value = false;
+          return ActiveSessionType.none;
+        }
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        token = await userProvider.getFreshToken();
+      }
+
+      if (token == null) {
         isLoading.value = false;
         return ActiveSessionType.none;
       }
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      token = await userProvider.getFreshToken();
-    }
 
-    if (token == null) {
-      isLoading.value = false;
-      return ActiveSessionType.none;
-    }
-
-    try {
       // 1. Check for pending withdrawal FIRST
       final pendingWithdrawal = await _boothService.getPendingWithdrawal(token);
       if (pendingWithdrawal != null) {
@@ -69,8 +71,8 @@ class ChargingController extends GetxController {
       // 2. Check for active charging session
       final status = await _boothService.getMyBatteryStatus(token);
       
-      // PROMPT FIX: If session is "completed" and battery is already removed, consider it NO session.
       if (status != null) {
+        // If session is "completed" and battery is already removed, consider it NO session.
         final bool isBatteryGone = status.telemetry?['batteryInserted'] == false;
         final bool isSessionOver = status.sessionStatus.toLowerCase() == 'completed' || 
                                  status.sessionStatus.toLowerCase() == 'collected';
@@ -89,6 +91,7 @@ class ChargingController extends GetxController {
         return ActiveSessionType.charging;
       }
       
+      batteryStatus.value = null;
       sessionType.value = ActiveSessionType.none;
       isLoading.value = false;
       return ActiveSessionType.none;
@@ -130,7 +133,7 @@ class ChargingController extends GetxController {
         telemetry: telemetry.isNotEmpty ? telemetry : status.telemetry,
       );
 
-      // PROMPT FIX: Handle session termination from Firebase more accurately
+      // Handle session termination from Firebase more accurately
       final bool isBatteryGone = telemetry['batteryInserted'] == false;
       final String normalizedStatus = sessionStatus.toLowerCase();
       
@@ -151,7 +154,58 @@ class ChargingController extends GetxController {
 
   Future<void> initiateCollection() async {
     isLoading.value = true;
-    Get.toNamed('/payment');
+    try {
+      final BuildContext? context = Get.context;
+      if (context == null) return;
+      
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final token = await userProvider.getFreshToken();
+      
+      if (token == null) {
+        Get.snackbar('Error', 'Authentication failed');
+        return;
+      }
+
+      final response = await _boothService.stopCharging(token);
+      debugPrint('Stop Charging Response: $response');
+
+      Get.toNamed('/stop-charging');
+    } catch (e) {
+      Get.snackbar('Action Failed', e.toString(), 
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> startWithdrawal() async {
+    try {
+      final BuildContext? context = Get.context;
+      if (context == null) return;
+      
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final token = await userProvider.getFreshToken();
+      
+      if (token == null) {
+        Get.snackbar('Error', 'Authentication failed');
+        return;
+      }
+
+      await _boothService.initiateWithdrawal(token);
+      // Automatically proceed to payment screen
+      Get.offAllNamed('/payment');
+    } catch (e) {
+      Get.snackbar('Withdrawal Failed', e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white
+      );
+      // If it fails, we might want to go back to the charging screen or dashboard
+      Get.offAllNamed('/dashboard');
+    }
   }
 
   void _stopTimers() {

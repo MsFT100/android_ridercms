@@ -12,6 +12,7 @@ import 'package:ridercms/controllers/charging_controller.dart';
 import 'package:ridercms/middleware/session_middleware.dart';
 import 'package:ridercms/providers/notification_provider.dart';
 import 'package:ridercms/screens/auth/reset_password_screen.dart';
+import 'package:ridercms/screens/home/charging_stop_wait_screen.dart';
 import 'package:ridercms/screens/home/history_screen.dart';
 import 'package:ridercms/screens/legal/privacy_policy.dart';
 import 'package:ridercms/screens/legal/terms_of_service.dart';
@@ -128,6 +129,7 @@ class MyApp extends StatelessWidget {
           GetPage(name: '/map', page: () => const MapScreen()),
           GetPage(name: '/slot-assigned', page: () => const SlotAssignedScreen()),
           GetPage(name: '/charging', page: () => const ChargingScreen()),
+          GetPage(name: '/stop-charging', page: () => const ChargingStopWaitScreen()),
           GetPage(name: '/session-complete', page: () => const SessionCompleteScreen()),
           GetPage(name: '/reset-password', page: () => const ResetPasswordScreen()),
           GetPage(name: '/history', page: () => const HistoryScreen()),

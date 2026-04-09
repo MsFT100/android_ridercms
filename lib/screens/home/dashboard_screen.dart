@@ -90,6 +90,7 @@ class DashboardScreen extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: kBgCard,
                                     borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1),
                                   ),
                                   child: const Icon(Icons.notifications_none, color: kTextPrimary),
                                 ),
