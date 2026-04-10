@@ -35,6 +35,11 @@ class ScanController extends GetxController {
       final releaseResult = await _boothService.releaseBattery(token, code);
 
       if (releaseResult['success'] == true) {
+        final chargingController = Get.find<ChargingController>();
+        // Clear local session state immediately so scan is re-enabled on dashboard.
+        chargingController.batteryStatus.value = null;
+        chargingController.sessionType.value = ActiveSessionType.none;
+
         if (context.mounted) {
           CustomSnackBar.show(context, releaseResult['message']);
           Get.offAllNamed('/dashboard'); 
