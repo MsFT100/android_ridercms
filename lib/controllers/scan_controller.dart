@@ -13,6 +13,9 @@ class ScanController extends GetxController {
   final BoothService _boothService = BoothService();
   final MobileScannerController cameraController = MobileScannerController();
   
+  String? _lastCode;
+  DateTime? _lastAttemptAt;
+
   var isProcessing = false.obs;
   var isTorchOn = false.obs;
 
@@ -20,6 +23,17 @@ class ScanController extends GetxController {
 
   Future<void> handleQrCode(BuildContext context, String code) async {
     if (isProcessing.value) return;
+
+    // The camera reports the same code on every frame. After a failed attempt
+    // (e.g. a non-booth QR) don't re-submit it and spam the API and snackbars.
+    final now = DateTime.now();
+    if (code == _lastCode &&
+        _lastAttemptAt != null &&
+        now.difference(_lastAttemptAt!) < const Duration(seconds: 4)) {
+      return;
+    }
+    _lastCode = code;
+    _lastAttemptAt = now;
 
     isProcessing.value = true;
 

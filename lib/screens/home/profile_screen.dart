@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:get/get.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../controllers/profile_controller.dart';
+import '../../providers/app_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../utils/enums/enums.dart';
 import '../../utils/themes/app_theme.dart';
@@ -124,9 +125,9 @@ class ProfileScreen extends StatelessWidget {
                   _buildOptionTile(
                     icon: Icons.history,
                     label: "Transaction History",
-                    onTap: () {
-                      Get.toNamed('/history');
-                    },
+                    // History is a tab: the bare '/history' route has no
+                    // Scaffold or back button.
+                    onTap: () => context.read<AppProvider>().setIndex(2),
                   ),
                   const SizedBox(height: 32),
                   const Text(

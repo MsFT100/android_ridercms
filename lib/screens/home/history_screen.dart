@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ridercms/models/booth_models.dart';
+import 'package:ridercms/providers/app_provider.dart';
 import 'package:ridercms/providers/user_provider.dart';
 import 'package:ridercms/services/booth_service.dart';
 import 'package:ridercms/utils/themes/app_theme.dart';
@@ -52,8 +53,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Whether the History tab was the visible one on the previous build.
+  bool _wasVisible = false;
+
   @override
   Widget build(BuildContext context) {
+    // The tabs live in an IndexedStack, so initState only runs once. Reload
+    // each time the tab is opened or new sessions never show up.
+    final bool visible =
+        context.select<AppProvider, int>((p) => p.currentIndex) == 2;
+    if (visible && !_wasVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
+    }
+    _wasVisible = visible;
+
     return Container(
       color: kBgDark,
       child: Column(

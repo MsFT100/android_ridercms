@@ -198,7 +198,7 @@ class SlotAssignedController extends GetxController {
       final token = await userProvider.getFreshToken();
       if (token == null) throw 'Authentication failed';
 
-      await _boothService.cancelActiveSession(token);
+      await _boothService.cancelActiveSession(token, sessionId: sessionId.value);
       _pollingTimer?.cancel();
       _statusSubscription?.cancel();
       Get.offAllNamed('/dashboard');

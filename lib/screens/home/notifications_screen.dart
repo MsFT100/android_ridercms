@@ -54,6 +54,7 @@ class NotificationsScreen extends StatelessWidget {
 
     switch (notification.type) {
       case 'payment_success':
+      case 'rental_payment_success':
         icon = Icons.check_circle_outline;
         iconColor = kPrimary;
         break;

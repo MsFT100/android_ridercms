@@ -65,6 +65,9 @@ class RentalController extends GetxController {
   Timer? _pollTimer;
   bool _disposed = false;
 
+  /// STK request awaiting a result; set until it is known paid or failed.
+  String? _pendingCheckoutId;
+
   String get displayBoothName =>
       boothName.value.trim().isNotEmpty ? boothName.value.trim() : boothUid.value;
 
@@ -393,24 +396,32 @@ class RentalController extends GetxController {
         return false;
       }
 
-      final result = await _boothService.payRental(token, id);
-      if (_disposed) return false;
+      // A previous attempt that timed out may still be paid on the rider's
+      // phone. Resume watching that request instead of sending a second STK
+      // push, which could charge them twice.
+      String? checkoutId = _pendingCheckoutId;
 
-      bill.value = RentalBill(
-        sessionId: id,
-        amount: result.amount,
-        consolidation: result.consolidation,
-      );
+      if (checkoutId == null) {
+        final result = await _boothService.payRental(token, id);
+        if (_disposed) return false;
 
-      if (result.isPaid) {
-        paymentStage.value = RentalPaymentStage.success;
-        return true;
-      }
+        bill.value = RentalBill(
+          sessionId: id,
+          amount: result.amount,
+          consolidation: result.consolidation,
+        );
 
-      final checkoutId = result.checkoutRequestId;
-      if (checkoutId == null || checkoutId.isEmpty) {
-        paymentStage.value = RentalPaymentStage.failed;
-        return false;
+        if (result.isPaid) {
+          paymentStage.value = RentalPaymentStage.success;
+          return true;
+        }
+
+        checkoutId = result.checkoutRequestId;
+        if (checkoutId == null || checkoutId.isEmpty) {
+          paymentStage.value = RentalPaymentStage.failed;
+          return false;
+        }
+        _pendingCheckoutId = checkoutId;
       }
 
       final deadline = DateTime.now().add(paymentTimeout);
@@ -418,14 +429,19 @@ class RentalController extends GetxController {
         await Future<void>.delayed(paymentPollInterval);
         if (_disposed) return false;
         try {
+          // Fresh token per poll: the one above can expire during the wait.
+          final pollToken = await _token() ?? token;
           final status =
-              await _boothService.getRentalPaymentStatus(token, checkoutId);
+              await _boothService.getRentalPaymentStatus(pollToken, checkoutId);
           final normalized = status.toLowerCase();
           if (normalized == 'paid') {
+            _pendingCheckoutId = null;
             paymentStage.value = RentalPaymentStage.success;
             return true;
           }
           if (normalized == 'failed') {
+            // Definitively failed: the next attempt may send a new request.
+            _pendingCheckoutId = null;
             paymentStage.value = RentalPaymentStage.failed;
             return false;
           }
@@ -434,6 +450,8 @@ class RentalController extends GetxController {
         }
       }
 
+      // Timed out without an answer: keep [_pendingCheckoutId] so "Try Again"
+      // re-checks this request first.
       paymentStage.value = RentalPaymentStage.failed;
       return false;
     } catch (_) {

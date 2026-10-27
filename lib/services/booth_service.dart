@@ -304,10 +304,18 @@ class BoothService {
         )
         .timeout(_timeout);
 
-    _ensureSuccess(response, 'Failed to initiate M-Pesa payment');
+    // 409: a prompt was already sent for this session. Keep waiting on it
+    // instead of failing, so the rider is never asked to pay twice.
+    if (response.statusCode != 409) {
+      _ensureSuccess(response, 'Failed to initiate M-Pesa payment');
+    }
     final data = _decode(response);
     final checkoutRequestId =
         data is Map ? data['checkoutRequestId']?.toString() : null;
+    if (response.statusCode == 409 &&
+        (checkoutRequestId == null || checkoutRequestId.isEmpty)) {
+      throw _errorFrom(response, 'Payment already in progress');
+    }
     if (checkoutRequestId == null || checkoutRequestId.isEmpty) {
       throw BoothApiException(
         'M-Pesa did not return a checkout id',
@@ -407,14 +415,16 @@ class BoothService {
     }
   }
 
-  /// Cancels the rider's oldest active session (`POST /booths/cancel-session`).
+  /// Cancels a session (`POST /booths/cancel-session`).
   ///
-  /// The endpoint is account-scoped, not session-scoped.
-  Future<void> cancelActiveSession(String token) async {
+  /// Always pass [sessionId] when it is known: without it the backend picks
+  /// the rider's newest cancellable session, which may not be the one on screen.
+  Future<void> cancelActiveSession(String token, {int? sessionId}) async {
     final response = await http
         .post(
           Uri.parse('$_baseUrl/booths/cancel-session'),
-          headers: _headers(token),
+          headers: _headers(token, json: sessionId != null),
+          body: sessionId != null ? json.encode({'sessionId': sessionId}) : null,
         )
         .timeout(_timeout);
 
@@ -590,8 +600,15 @@ class BoothService {
         )
         .timeout(_timeout);
 
-    _ensureSuccess(response, 'Failed to pay the rental bill');
+    // 409 with a checkout id: a prompt is already out for this bill. Resume
+    // polling it rather than treating it as an error.
     final data = _decode(response);
+    final bool resumable = response.statusCode == 409 &&
+        data is Map &&
+        (data['checkoutRequestId']?.toString().isNotEmpty ?? false);
+    if (!resumable) {
+      _ensureSuccess(response, 'Failed to pay the rental bill');
+    }
     if (data is Map) {
       return PayRentalResult.fromJson(Map<String, dynamic>.from(data));
     }

@@ -88,7 +88,8 @@ class RentalPaymentScreen extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               failed
-                  ? 'The payment was not completed. Please try again.'
+                  ? "We couldn't confirm the payment. If you entered your PIN, "
+                      'tap Try Again to re-check it - you will not be charged twice.'
                   : waiting
                       ? 'Enter your M-Pesa PIN on the prompt sent to your phone. '
                           'This screen updates automatically.'
