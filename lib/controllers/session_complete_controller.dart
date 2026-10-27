@@ -18,15 +18,16 @@ class SessionCompleteController extends GetxController {
     // Extract arguments passed during navigation
     final dynamic args = Get.arguments;
     
-    sessionId = args?['sessionId'] ?? 'S000';
-    boothName = args?['boothName'] ?? 'Station';
+    sessionId = args?['sessionId']?.toString() ?? '---';
+    boothName = args?['boothName']?.toString() ?? 'Station';
     totalAmount = (args?['totalAmount'] as num?)?.toDouble() ?? 0.0;
     energyDelivered = (args?['energyDelivered'] as num?)?.toDouble() ?? 0.0;
-    durationMinutes = args?['durationMinutes'] ?? 0;
-    transactionId = args?['transactionId'] ?? '---';
+    durationMinutes = (args?['durationMinutes'] as num?)?.toInt() ?? 0;
+    transactionId = args?['transactionId']?.toString() ?? '---';
     
     // Fallback to empty list if no batteries provided
-    batteries = args?['batteries'] ?? [];
+    final dynamic rawBatteries = args?['batteries'];
+    batteries = rawBatteries is List ? rawBatteries : [];
   }
 
   void setRating(int value) {

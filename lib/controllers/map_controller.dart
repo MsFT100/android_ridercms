@@ -30,7 +30,12 @@ class MapController extends GetxController {
   Future<void> _initMap() async {
     await fetchBooths();
     _startPolling();
-    _determinePosition();
+    try {
+      await _determinePosition();
+    } catch (e) {
+      // No GPS fix / timeout: the map simply stays on its default camera.
+      if (kDebugMode) print("Error determining position: $e");
+    }
   }
 
   void _startPolling() {
@@ -51,7 +56,11 @@ class MapController extends GetxController {
       if (token == null) return;
 
       if (showLoading) isLoading.value = true;
-      final fetchedBooths = await _boothService.getBooths(token);
+      // A booth without coordinates parses to 0,0 and would be pinned in the
+      // ocean off West Africa; leave it off the map.
+      final fetchedBooths = (await _boothService.getBooths(token))
+          .where((b) => b.latitude != 0 || b.longitude != 0)
+          .toList();
       booths.value = fetchedBooths;
       
       final boothMarkers = fetchedBooths.map((booth) => Marker(
@@ -63,7 +72,7 @@ class MapController extends GetxController {
         ),
       )).toList();
 
-      markers.value = boothMarkers.toSet();
+      markers.assignAll(boothMarkers);
     } catch (e) {
       if (kDebugMode) print("Error fetching booths: $e");
     } finally {

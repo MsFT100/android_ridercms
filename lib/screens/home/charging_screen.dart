@@ -5,12 +5,33 @@ import '../../controllers/charging_controller.dart';
 import '../../utils/themes/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
-class ChargingScreen extends StatelessWidget {
+class ChargingScreen extends StatefulWidget {
   const ChargingScreen({super.key});
 
   @override
+  State<ChargingScreen> createState() => _ChargingScreenState();
+}
+
+class _ChargingScreenState extends State<ChargingScreen> {
+  late final ChargingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = Get.find<ChargingController>();
+    _controller.startPolling();
+    _controller.refreshBatteries();
+  }
+
+  @override
+  void dispose() {
+    _controller.stopPolling();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = Get.find<ChargingController>();
+    final controller = _controller;
 
     return PopScope(
       canPop: false,
@@ -63,6 +84,37 @@ class ChargingScreen extends StatelessWidget {
                             ],
                           ),
                         ),
+                        if (controller.batteryCount > 1)
+                          GestureDetector(
+                            onTap: () => Get.toNamed('/batteries'),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: kBgCard2,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.battery_charging_full,
+                                      size: 14, color: kTextSecondary),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${controller.batteryCount}',
+                                    style: const TextStyle(
+                                      color: kTextSecondary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
@@ -207,13 +259,15 @@ class ChargingScreen extends StatelessWidget {
                               children: [
                                 _StatItem(
                                   label: 'TEMPERATURE',
-                                  value: '${status.telemetry?['temperatureC'] ?? "---"}°C',
+                                  value: status.telemetry?.temperature == null
+                                      ? '---'
+                                      : '${status.telemetry!.temperature!.toStringAsFixed(1)}°C',
                                   icon: Icons.thermostat,
                                 ),
                                 const SizedBox(width: 12),
                                 _StatItem(
                                   label: 'VOLTAGE',
-                                  value: '${_formatVoltage(status.telemetry?['voltage'])}V',
+                                  value: '${_formatVoltage(status.telemetry?.voltage)}V',
                                   icon: Icons.bolt,
                                 ),
                               ],

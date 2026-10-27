@@ -92,19 +92,19 @@ class PermissionService {
       case Permission.location:
         return _PermissionInfo(
           title: "Location Access",
-          message: "Location is required to match you with nearby ride requests.",
+          message: "Location is used to show booths near you and guide you to them.",
           icon: Icons.location_on,
         );
       case Permission.notification:
         return _PermissionInfo(
           title: "Notifications",
-          message: "We alert you about new rides, trip updates, and payments.",
+          message: "We alert you about payment confirmations and your battery's charging status.",
           icon: Icons.notifications_active,
         );
       case Permission.camera:
         return _PermissionInfo(
           title: "Camera Access",
-          message: "Camera is needed to upload documents or profile pictures.",
+          message: "The camera is used to scan the QR code on a booth.",
           icon: Icons.camera_alt,
         );
       case Permission.storage:

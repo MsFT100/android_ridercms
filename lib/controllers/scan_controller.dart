@@ -36,30 +36,40 @@ class ScanController extends GetxController {
 
       if (releaseResult['success'] == true) {
         final chargingController = Get.find<ChargingController>();
-        // Clear local session state immediately so scan is re-enabled on dashboard.
-        chargingController.batteryStatus.value = null;
-        chargingController.sessionType.value = ActiveSessionType.none;
+        // Refresh local state so the released battery disappears immediately.
+        await chargingController.checkSessionStatus();
 
         if (context.mounted) {
           CustomSnackBar.show(context, releaseResult['message']);
-          Get.offAllNamed('/dashboard'); 
+          Get.offAllNamed('/dashboard');
         }
         return;
       }
 
-      // Fallback to deposit if no paid session exists
-      if (releaseResult['message'].toString().contains('No paid withdrawal session')) {
+      // Fallback to deposit if no paid session exists (the endpoint answers 404
+      // for exactly that case; the text match covers older backends).
+      if (releaseResult['statusCode'] == 404 ||
+          releaseResult['message'].toString().contains('No paid withdrawal session')) {
          final depositResult = await _boothService.initiateDeposit(token, code);
 
-         if (depositResult.containsKey('error')) {
-           throw depositResult['error'];
-         }
+         // Real shape: { slot: { identifier, status }, sessionId }
+         final dynamic slot = depositResult['slot'];
+         final String slotIdentifier = slot is Map
+             ? (slot['identifier']?.toString() ?? '---')
+             : (depositResult['slotIdentifier']?.toString() ?? '---');
+         final dynamic rawSessionId = depositResult['sessionId'];
+         final int? sessionId = rawSessionId is num
+             ? rawSessionId.toInt()
+             : int.tryParse(rawSessionId?.toString() ?? '');
 
          if (context.mounted) {
-           CustomSnackBar.show(context, 'Deposit initiated! Proceed to slot ${depositResult['slotIdentifier']}');
-           // Ensure we pass boothUid explicitly for the Firebase listener
+           CustomSnackBar.show(context, 'Deposit initiated! Proceed to slot $slotIdentifier');
+           // Pass the real slot identifier and session id so the assignment
+           // screen can track this exact deposit (and detect cancellations).
            Get.offNamed('/slot-assigned', arguments: {
-             ...depositResult,
+             'slotIdentifier': slotIdentifier,
+             'sessionId': sessionId,
+             'slot': slot,
              'boothUid': code,
            });
          }

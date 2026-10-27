@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:ridercms/controllers/session_complete_controller.dart';
 import 'package:ridercms/utils/themes/app_theme.dart';
 import 'package:ridercms/widgets/common_widgets.dart';
 
@@ -10,26 +12,32 @@ class SessionCompleteScreen extends StatefulWidget {
 }
 
 class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
-  int _rating = 0;
+  late final SessionCompleteController _controller;
 
-  final List<Map<String, dynamic>> _batteries = [
-    {
-      'id': 'BAT-990122',
-      'slot': 'A2',
-      'fee': '135',
-      'chargeTime': '1h 12m',
-      'startCharge': 12,
-      'endCharge': 100,
-    },
-    {
-      'id': 'BAT-990145',
-      'slot': 'B4',
-      'fee': '135',
-      'chargeTime': '1h 26m',
-      'startCharge': 8,
-      'endCharge': 100,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _controller = Get.put(SessionCompleteController());
+  }
+
+  @override
+  void dispose() {
+    Get.delete<SessionCompleteController>();
+    super.dispose();
+  }
+
+  /// Battery rows come from navigation arguments as maps with `id`, `slot`,
+  /// `fee`, `chargeTime`, `startCharge` and `endCharge`.
+  List<Map<String, dynamic>> get _batteries => _controller.batteries
+      .whereType<Map>()
+      .map((b) => Map<String, dynamic>.from(b))
+      .toList();
+
+  int get _chargeAdded => _batteries.fold<int>(0, (sum, b) {
+        final start = (b['startCharge'] as num?)?.toInt() ?? 0;
+        final end = (b['endCharge'] as num?)?.toInt() ?? start;
+        return sum + (end - start).clamp(0, 100);
+      });
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +130,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              battery['id']! as String,
+                                              '${battery['id'] ?? 'Own battery'}',
                                               style: const TextStyle(
                                                   color: kTextPrimary,
                                                   fontSize: 13,
@@ -140,12 +148,12 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.end,
                                         children: [
-                                          Text('KSh ${battery['fee']}',
+                                          Text('KSh ${battery['fee'] ?? '-'}',
                                               style: const TextStyle(
                                                   color: kTextPrimary,
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w700)),
-                                          Text(battery['chargeTime']! as String,
+                                          Text('${battery['chargeTime'] ?? ''}',
                                               style: const TextStyle(
                                                   color: kTextSecondary,
                                                   fontSize: 11)),
@@ -156,7 +164,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                                   const SizedBox(height: 12),
                                   Row(
                                     children: [
-                                      Text('${battery['startCharge']}%',
+                                      Text('${battery['startCharge'] ?? 0}%',
                                           style: const TextStyle(
                                               color: kWarning,
                                               fontSize: 11,
@@ -165,7 +173,7 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                                       const Expanded(
                                           child: AppProgressBar(value: 1.0)),
                                       const SizedBox(width: 8),
-                                      Text('${battery['endCharge']}%',
+                                      Text('${battery['endCharge'] ?? 0}%',
                                           style: const TextStyle(
                                               color: kPrimary,
                                               fontSize: 11,
@@ -193,24 +201,17 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                         AppCard(
                           child: Column(
                             children: [
-                              _SummaryRow(label: 'Subtotal', value: 'KSh 270'),
-                              const SizedBox(height: 8),
-                              _SummaryRow(label: 'Service Fee', value: 'KSh 14'),
-                              const SizedBox(height: 12),
-                              Divider(
-                                  color: Colors.white.withValues(alpha: 0.06),
-                                  height: 1),
-                              const SizedBox(height: 12),
-                              const Row(
+                              Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Total Paid',
+                                  const Text('Total Paid',
                                       style: TextStyle(
                                           color: kTextPrimary,
                                           fontWeight: FontWeight.w700)),
-                                  Text('KSh 284',
-                                      style: TextStyle(
+                                  Text(
+                                      'KSh ${_controller.totalAmount.toStringAsFixed(0)}',
+                                      style: const TextStyle(
                                           color: kPrimary,
                                           fontSize: 20,
                                           fontWeight: FontWeight.w700)),
@@ -220,15 +221,15 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                               _SummaryRow(
                                   label: 'Payment Method', value: 'M-Pesa'),
                               const SizedBox(height: 4),
-                              const Row(
+                              Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Transaction ID',
+                                  const Text('Transaction ID',
                                       style: TextStyle(
                                           color: kTextSecondary, fontSize: 12)),
-                                  Text('MPE240310001234',
-                                      style: TextStyle(
+                                  Text(_controller.transactionId,
+                                      style: const TextStyle(
                                           color: kTextSecondary,
                                           fontSize: 12,
                                           fontFamily: 'monospace')),
@@ -240,26 +241,27 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                         const SizedBox(height: 16),
 
                         // Stats
-                        const Row(
+                        Row(
                           children: [
                             Expanded(
                               child: _StatCard(
                                   iconData: Icons.battery_full,
-                                  value: '2',
+                                  value: '${_batteries.length}',
                                   label: 'Batteries'),
                             ),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: _StatCard(
                                   iconData: Icons.timer,
-                                  value: '2h 38m',
+                                  value: _controller.formatDuration(
+                                      _controller.durationMinutes),
                                   label: 'Total Time'),
                             ),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: _StatCard(
                                   iconData: Icons.flash_on,
-                                  value: '133%',
+                                  value: '$_chargeAdded%',
                                   label: 'Charged'),
                             ),
                           ],
@@ -280,14 +282,14 @@ class _SessionCompleteScreenState extends State<SessionCompleteScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: List.generate(5, (i) {
                                   return GestureDetector(
-                                    onTap: () =>
-                                        setState(() => _rating = i + 1),
+                                    onTap: () => setState(
+                                        () => _controller.setRating(i + 1)),
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 4),
                                       child: Icon(Icons.star,
                                           size: 32,
-                                          color: i < _rating
+                                          color: i < _controller.rating.value
                                               ? Colors.amber
                                               : Colors.white
                                                   .withValues(alpha: 0.3)),

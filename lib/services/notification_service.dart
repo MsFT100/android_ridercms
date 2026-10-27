@@ -15,7 +15,17 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   final AuthService _authService = AuthService();
 
+  static bool _initialized = false;
+
+  /// Sets up push + local notifications. Safe to call after every login: the
+  /// listeners are attached once, later calls only re-sync the FCM token.
   Future<void> initialize() async {
+    if (_initialized) {
+      await syncToken();
+      return;
+    }
+    _initialized = true;
+
     // 1. Request Permissions
     await _firebaseMessaging.requestPermission(
       alert: true,
@@ -39,9 +49,15 @@ class NotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
-        if (response.payload != null && response.payload!.isNotEmpty) {
-          final Map<String, dynamic> data = jsonDecode(response.payload!);
-          _handleNotificationAction(data, null);
+        final payload = response.payload;
+        if (payload == null || payload.isEmpty) return;
+        try {
+          final decoded = jsonDecode(payload);
+          if (decoded is Map) {
+            _handleNotificationAction(Map<String, dynamic>.from(decoded), null);
+          }
+        } catch (e) {
+          debugPrint('Ignoring malformed notification payload: $e');
         }
       },
     );

@@ -36,6 +36,7 @@ dependencies:
   permission_handler: ^12.0.0+1
   shared_preferences: ^2.5.4
   url_launcher: ^6.2.5
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:
@@ -46,5 +47,3 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
-    - assets/animations/
-    - assets/svg/

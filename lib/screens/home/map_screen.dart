@@ -24,7 +24,7 @@ class MapScreen extends StatelessWidget {
           // 1. Google Map
           Obx(() => GoogleMap(
                 initialCameraPosition: _kInitialPosition,
-                markers: controller.markers.value,
+                markers: controller.markers.toSet(),
                 onMapCreated: controller.onMapCreated,
                 myLocationEnabled: true,
                 myLocationButtonEnabled: false,

@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:provider/provider.dart';
 import 'package:ridercms/widgets/common_widgets.dart';
+import '../../controllers/charging_controller.dart';
 import '../../models/booth_models.dart';
+import '../../providers/user_provider.dart';
 import '../../services/booth_service.dart';
 import '../../utils/themes/app_theme.dart';
 
@@ -34,16 +37,21 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
   Timer? _pollingTimer;
   late AnimationController _pulseController;
 
-  late final String checkoutRequestId;
-  late final WithdrawalSession session;
-  late final String token;
+  String checkoutRequestId = '';
+  WithdrawalSession? session;
+  int? depositSessionId;
 
   @override
   void initState() {
     super.initState();
-    checkoutRequestId = Get.arguments['checkoutRequestId'];
-    session = Get.arguments['session'];
-    token = Get.arguments['token'];
+    final dynamic args = Get.arguments;
+    final Map<dynamic, dynamic> map = args is Map ? args : const {};
+    checkoutRequestId = map['checkoutRequestId']?.toString() ?? '';
+    final dynamic rawSession = map['session'];
+    session = rawSession is WithdrawalSession ? rawSession : null;
+    depositSessionId = map['depositSessionId'] is int
+        ? map['depositSessionId'] as int
+        : int.tryParse(map['depositSessionId']?.toString() ?? '');
 
     _pulseController = AnimationController(
       vsync: this,
@@ -51,6 +59,14 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
       lowerBound: 0.9,
       upperBound: 1.2,
     )..repeat(reverse: true);
+
+    // Opened without a payment to track (e.g. restored route): nothing to poll.
+    if (checkoutRequestId.isEmpty || session == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Get.offAllNamed('/dashboard');
+      });
+      return;
+    }
 
     _startProgressAnimation();
     _startPolling();
@@ -73,11 +89,19 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       attempts++;
       if (attempts > 30) { // 90 seconds timeout
-        _handleFailure('Payment timed out. Please check your M-Pesa.');
+        _handleFailure(
+          "We couldn't confirm your payment yet. If M-Pesa charged you, "
+          'it will show in your history shortly - do not pay again.',
+          unconfirmed: true,
+        );
         return;
       }
 
       try {
+        // Fetch per poll: a token captured at screen open can expire mid-wait.
+        final token = await Provider.of<UserProvider>(context, listen: false)
+            .getFreshToken();
+        if (token == null || !mounted) return;
         final status = await _boothService.getWithdrawalStatus(token, checkoutRequestId);
         final normalizedStatus = status.toLowerCase();
         
@@ -100,8 +124,19 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
     _pollingTimer?.cancel();
     if (!mounted) return;
     setState(() => _isFinalizing = true);
-    
+
+    // The battery has been paid for — drop exactly that card from the list.
+    if (depositSessionId != null) {
+      try {
+        Get.find<ChargingController>()
+            .removeBatteryBySessionId(depositSessionId!);
+      } catch (_) {
+        // Controller not registered (e.g. deep link): ignore.
+      }
+    }
+
     Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
       Get.offNamed('/payment-success', arguments: {
         'session': session,
         'checkoutRequestId': checkoutRequestId,
@@ -109,10 +144,11 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
     });
   }
 
-  void _handleFailure(String error) {
+  void _handleFailure(String error, {bool unconfirmed = false}) {
     _pollingTimer?.cancel();
     if (!mounted) return;
-    Get.offNamed('/payment-failed', arguments: {'error': error});
+    Get.offNamed('/payment-failed',
+        arguments: {'error': error, 'unconfirmed': unconfirmed});
   }
 
   @override
@@ -215,7 +251,7 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen>
                     const Text("Amount to be paid", style: TextStyle(color: kTextSecondary, fontSize: 12)),
                     const SizedBox(height: 8),
                     Text(
-                      "KSh ${session.amount}",
+                      "KSh ${session?.amount ?? '--'}",
                       style: const TextStyle(color: kPrimary, fontSize: 32, fontWeight: FontWeight.w900),
                     ),
                   ],

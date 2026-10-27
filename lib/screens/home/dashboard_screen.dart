@@ -7,12 +7,28 @@ import 'package:ridercms/providers/notification_provider.dart';
 import 'package:ridercms/providers/user_provider.dart';
 import 'package:ridercms/screens/home/scan_screen.dart';
 import 'package:ridercms/screens/home/notifications_screen.dart';
+import 'package:ridercms/services/booth_service.dart';
+import 'package:ridercms/utils/rental_launcher.dart';
 import 'package:ridercms/utils/themes/app_theme.dart';
+import 'package:ridercms/widgets/custom_snackbar.dart';
 
 import '../../widgets/home/quick_action.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  late final ChargingController _chargingController;
+  final BoothService _boothService = BoothService();
+
+  /// Rentals are visible by default; the feature flag can hide the action.
+  bool _rentalEnabled = true;
+  bool _checkingRental = false;
+  bool _rentalUnavailable = false;
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -26,12 +42,78 @@ class DashboardScreen extends StatelessWidget {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _chargingController = Get.find<ChargingController>();
+    _chargingController.startPolling(interval: const Duration(seconds: 5));
+    _chargingController.refreshBatteries();
+    _loadRentalFeature();
+  }
+
+  Future<String?> _token() async {
+    try {
+      return await context.read<UserProvider>().getFreshToken();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _loadRentalFeature() async {
+    final token = await _token();
+    if (token == null || !mounted) return;
+    try {
+      final status = await _boothService.getRentalFeatureStatus(token);
+      if (!mounted) return;
+      setState(() => _rentalEnabled = status.enabled);
+    } catch (_) {
+      // If the flag cannot be fetched, keep the rental action visible.
+      if (!mounted) return;
+      setState(() => _rentalEnabled = true);
+    }
+  }
+
+  /// Delegates to the shared [openRental] launcher (resume, feature flag,
+  /// limit check, highest-SOC auto-assignment).
+  Future<void> _openRental() async {
+    if (_checkingRental) return;
+
+    if (!_rentalEnabled) {
+      CustomSnackBar.show(
+        context,
+        'Battery rentals are currently disabled.',
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() {
+      _checkingRental = true;
+      _rentalUnavailable = false;
+    });
+
+    final result = await openRental(context);
+    if (!mounted) return;
+
+    setState(() {
+      _checkingRental = false;
+      _rentalUnavailable = result == RentalLaunchResult.unavailable;
+      if (result == RentalLaunchResult.disabled) _rentalEnabled = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _chargingController.stopPolling();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 1. Watch the UserProvider for changes
     final userProvider = context.watch<UserProvider>();
     final appProvider = context.read<AppProvider>();
     final notificationProvider = context.watch<NotificationProvider>();
-    final chargingController = Get.find<ChargingController>();
+    final chargingController = _chargingController;
 
     final userName = userProvider.firebaseUser?.displayName ?? 'RiderCMS';
     final unreadCount = notificationProvider.unreadCount;
@@ -163,34 +245,80 @@ class DashboardScreen extends StatelessWidget {
                             onTap: () => appProvider.setIndex(1),
                           ),
 
+                          // Depositing another battery is always allowed while
+                          // others charge — only an unpaid session blocks it.
                           Obx(() {
-                            final bool hasSession = chargingController.hasActiveSession();
+                            final bool hasPending =
+                                chargingController.hasPendingWithdrawal.value;
+                            final int count = chargingController.batteryCount;
                             return QuickAction(
                               icon: Icons.qr_code_scanner,
-                              title: "Scan Battery",
-                              subtitle: hasSession ? "Session active" : "Start charging now",
+                              title: count > 0 ? "Add Battery" : "Scan Battery",
+                              subtitle: hasPending
+                                  ? "Complete your payment first"
+                                  : count > 0
+                                      ? "$count charging · add another"
+                                      : "Start charging now",
                               gradient: const [Color(0xFF1a2a1a), Color(0xFF1e4a2a)],
-                              opacity: hasSession ? 0.5 : 1.0,
-                              onTap: hasSession 
-                                ? () => Get.snackbar('Action Disabled', 'You already have an active session.') 
-                                : () => Get.to(ScanScreen()),
+                              opacity: hasPending ? 0.5 : 1.0,
+                              onTap: hasPending
+                                  ? () => Get.toNamed('/payment')
+                                  : () => Get.to(() => const ScanScreen()),
                             );
                           }),
 
-                          QuickAction(
-                            icon: Icons.bolt,
-                            title: "Active Session",
-                            subtitle: "View charging",
-                            gradient: const [Color(0xFF2a1a1a), Color(0xFF4a2a1e)],
-                            onTap: () => Get.toNamed('/charging'),
-                          ),
+                          Obx(() {
+                            final bool hasPending =
+                                chargingController.hasPendingWithdrawal.value;
+                            final int count = chargingController.batteryCount;
+                            return QuickAction(
+                              icon: Icons.bolt,
+                              title: "Active Session",
+                              subtitle: hasPending
+                                  ? "Payment pending"
+                                  : count > 1
+                                      ? "$count batteries"
+                                      : "View charging",
+                              gradient: const [Color(0xFF2a1a1a), Color(0xFF4a2a1e)],
+                              onTap: () {
+                                if (hasPending) {
+                                  Get.toNamed('/payment');
+                                } else if (count > 1) {
+                                  Get.toNamed('/batteries');
+                                } else {
+                                  Get.toNamed('/charging');
+                                }
+                              },
+                            );
+                          }),
+
+                          if (_rentalEnabled)
+                            QuickAction(
+                              icon: Icons.swap_horiz_rounded,
+                              title: _rentalUnavailable
+                                  ? "No Rentals"
+                                  : _checkingRental
+                                      ? "Checking…"
+                                      : "Rent a Battery",
+                              subtitle: _rentalUnavailable
+                                  ? "None available right now"
+                                  : _checkingRental
+                                      ? "Finding the best battery"
+                                      : "Swap while yours charges",
+                              gradient: const [
+                                Color(0xFF1a1a2e),
+                                Color(0xFF3b2f63),
+                              ],
+                              opacity: _rentalUnavailable ? 0.6 : 1.0,
+                              onTap: _openRental,
+                            ),
 
                           QuickAction(
-                            icon: Icons.card_giftcard,
-                            title: "Rewards",
-                            subtitle: "240 points earned",
+                            icon: Icons.history,
+                            title: "History",
+                            subtitle: "Your past sessions",
                             gradient: const [Color(0xFF1a1a2a), Color(0xFF2a1e4a)],
-                            onTap: () {},
+                            onTap: () => appProvider.setIndex(2),
                           ),
                         ],
                       )

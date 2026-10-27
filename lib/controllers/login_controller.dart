@@ -37,7 +37,11 @@ class LoginController extends GetxController {
         CustomSnackBar.show(context, 'Welcome back!', isError: false);
         Get.offAllNamed('/dashboard');
       } else {
-        CustomSnackBar.show(context, 'Login failed. Please check your credentials.', isError: true);
+        CustomSnackBar.show(
+          context,
+          userProvider.lastAuthError ?? 'Login failed. Please check your credentials.',
+          isError: true,
+        );
       }
     } else {
       // Sign Up

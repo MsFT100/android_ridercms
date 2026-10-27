@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:ridercms/controllers/charging_controller.dart';
 import 'package:ridercms/controllers/permission_controller.dart';
+import 'package:ridercms/services/booth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
 import '../utils/enums/enums.dart';
@@ -56,9 +57,28 @@ class _SplashScreenState extends State<SplashScreen> {
       // PROMPT FIX: Check for active session BEFORE navigating to dashboard
       // to avoid flickering from Dashboard to Charging screen.
       final ActiveSessionType sessionType = await chargingController.checkSessionStatus();
-      
+
       if (sessionType == ActiveSessionType.payment) {
         Get.offAllNamed('/payment');
+        return;
+      }
+
+      // An active rental takes precedence over the plain charging view: the
+      // rider's own battery is only in a slot because of that rental.
+      bool hasActiveRental = false;
+      try {
+        final token = await userProvider.getFreshToken();
+        if (token != null) {
+          hasActiveRental = await BoothService().getActiveRental(token) != null;
+        }
+      } catch (_) {
+        // Treat failures as "no rental" so the app still opens.
+      }
+
+      if (!mounted) return;
+
+      if (hasActiveRental) {
+        Get.offAllNamed('/rental');
       } else if (sessionType == ActiveSessionType.charging) {
         Get.offAllNamed('/charging');
       } else {

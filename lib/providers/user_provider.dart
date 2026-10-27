@@ -46,14 +46,14 @@ class UserProvider extends ChangeNotifier {
         if (profile != null) {
           _userModel = profile;
           _status = Status.authenticated;
-          await _notificationService.syncToken();
+          _startNotifications();
         } else {
           await Future.delayed(const Duration(seconds: 2));
           final retryProfile = await _apiService.getUserProfile();
           if (retryProfile != null) {
             _userModel = retryProfile;
             _status = Status.authenticated;
-            await _notificationService.syncToken();
+            _startNotifications();
           } else {
             _status = Status.authenticated;
           }
@@ -66,7 +66,18 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Rider-facing reason for the last failed [signInWithEmail], if any.
+  String? lastAuthError;
+
+  /// Not awaited: the permission prompt must not hold up the login flow.
+  void _startNotifications() {
+    unawaited(_notificationService.initialize().catchError((Object e) {
+      debugPrint('Notification setup failed: $e');
+    }));
+  }
+
   Future<bool> signInWithEmail(String email, String password) async {
+    lastAuthError = null;
     try {
       _status = Status.authenticating;
       notifyListeners();
@@ -74,13 +85,33 @@ class UserProvider extends ChangeNotifier {
       return true;
     } on FirebaseAuthException catch (e) {
       _status = Status.unauthenticated;
+      lastAuthError = _authErrorMessage(e.code);
       notifyListeners();
-      debugPrint('Login Error: ${e.message}');
+      debugPrint('Login Error: ${e.code} ${e.message}');
       return false;
     } catch (e) {
       _status = Status.unauthenticated;
+      lastAuthError = 'Something went wrong. Please try again.';
       notifyListeners();
       return false;
+    }
+  }
+
+  String _authErrorMessage(String code) {
+    switch (code) {
+      case 'invalid-credential':
+      case 'wrong-password':
+      case 'user-not-found':
+      case 'invalid-email':
+        return 'Incorrect email or password.';
+      case 'user-disabled':
+        return 'This account has been disabled. Contact support.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please wait a moment and try again.';
+      case 'network-request-failed':
+        return 'No internet connection. Check your network and try again.';
+      default:
+        return 'Login failed. Please try again.';
     }
   }
 

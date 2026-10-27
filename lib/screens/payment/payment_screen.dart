@@ -182,7 +182,7 @@ class PaymentScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          const Text('M-Pesa Phone Number',
+                          const Text('M-Pesa Number',
                               style: TextStyle(
                                   color: kTextSecondary,
                                   fontSize: 13,
@@ -190,6 +190,9 @@ class PaymentScreen extends StatelessWidget {
                           const SizedBox(height: 8),
                           TextField(
                             controller: controller.phoneController,
+                            // The backend charges the number on the rider's
+                            // account, so this is display-only.
+                            readOnly: true,
                             keyboardType: TextInputType.phone,
                             style: const TextStyle(color: kTextPrimary, fontWeight: FontWeight.w700),
                             decoration: InputDecoration(
@@ -199,7 +202,7 @@ class PaymentScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           const Text(
-                              'Confirm your number. You will receive an M-Pesa prompt to enter your PIN.',
+                              'The M-Pesa prompt will be sent to the number on your account. Update it in your profile to change it.',
                               style: TextStyle(color: kTextSecondary, fontSize: 12, height: 1.4)),
                         ],
                       ),

@@ -10,8 +10,17 @@ class PaymentSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final WithdrawalSession session = Get.arguments['session'];
-    final String checkoutRequestId = Get.arguments['checkoutRequestId'];
+    final dynamic args = Get.arguments;
+    final dynamic rawSession = args is Map ? args['session'] : null;
+    if (rawSession is! WithdrawalSession) {
+      // Opened without a payment (e.g. restored route): nothing to show.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.offAllNamed('/dashboard');
+      });
+      return const Scaffold(backgroundColor: kBgDark);
+    }
+    final WithdrawalSession session = rawSession;
+    final String checkoutRequestId = args['checkoutRequestId']?.toString() ?? '';
 
     return Scaffold(
       backgroundColor: kBgDark,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../controllers/charging_controller.dart';
 import '../../controllers/slot_assigned_controller.dart';
+import '../../utils/rental_launcher.dart';
 import '../../utils/themes/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -178,21 +180,89 @@ class SlotAssignedScreen extends StatelessWidget {
               const SizedBox(height: 32),
 
               // Bottom Actions
-              Obx(() => controller.doorStatus.value == DoorStatus.closed
-                  ? PrimaryButton(
-                      label: 'View Charging Session →',
-                      onPressed: () => Get.offAllNamed('/charging'),
-                    )
-                  : Column(
-                      children: [
-                        const CircularProgressIndicator(color: kPrimary),
-                        const SizedBox(height: 24),
-                        GhostButton(
-                          label: 'Cancel Session',
-                          onPressed: () => controller.cancelSession(),
+              Obx(() {
+                if (controller.cancelled.value) {
+                  return Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: kDanger.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: kDanger.withValues(alpha: 0.3)),
                         ),
-                      ],
-                    )),
+                        child: Text(
+                          controller.cancelReason.value.isEmpty
+                              ? 'This deposit session was cancelled.'
+                              : controller.cancelReason.value,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: kDanger, fontSize: 13),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      PrimaryButton(
+                        label: 'Return to Dashboard',
+                        onPressed: () => Get.offAllNamed('/dashboard'),
+                      ),
+                    ],
+                  );
+                }
+
+                if (controller.doorStatus.value == DoorStatus.closed) {
+                  return Column(
+                    children: [
+                      PrimaryButton(
+                        label: 'View Charging Session →',
+                        onPressed: () => Get.offAllNamed(
+                          Get.find<ChargingController>().batteryCount > 1
+                              ? '/batteries'
+                              : '/charging',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GhostButton(
+                        label: '+ Add Another Battery',
+                        onPressed: () => Get.offAllNamed('/scan'),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          TextButton(
+                            onPressed: () => Get.offAllNamed('/batteries'),
+                            child: const Text(
+                              'View All Batteries',
+                              style: TextStyle(color: kTextSecondary),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => openRental(
+                              context,
+                              boothUid: controller.boothUid.value,
+                              boothName: controller.boothName.value,
+                            ),
+                            child: const Text(
+                              'Rent a Battery',
+                              style: TextStyle(color: kPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                return Column(
+                  children: [
+                    const CircularProgressIndicator(color: kPrimary),
+                    const SizedBox(height: 24),
+                    GhostButton(
+                      label: 'Cancel Session',
+                      onPressed: () => controller.cancelSession(),
+                    ),
+                  ],
+                );
+              }),
               const SizedBox(height: 32),
             ],
           ),

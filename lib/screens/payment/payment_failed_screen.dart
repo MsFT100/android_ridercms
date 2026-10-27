@@ -9,6 +9,9 @@ class PaymentFailedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String error = Get.arguments?['error'] ?? 'Transaction failed';
+    // Status was never confirmed: the first STK push may still have gone
+    // through, so retrying here could charge the rider twice.
+    final bool unconfirmed = Get.arguments?['unconfirmed'] == true;
 
     return Scaffold(
       backgroundColor: kBgDark,
@@ -46,9 +49,9 @@ class PaymentFailedScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            const Text(
-              'Payment Failed',
-              style: TextStyle(
+            Text(
+              unconfirmed ? 'Payment Not Confirmed' : 'Payment Failed',
+              style: const TextStyle(
                 color: kTextPrimary,
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
@@ -73,15 +76,22 @@ class PaymentFailedScreen extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  PrimaryButton(
-                    label: 'Try Again',
-                    onPressed: () => Get.back(),
-                  ),
-                  const SizedBox(height: 12),
-                  GhostButton(
-                    label: 'Return to Dashboard',
-                    onPressed: () => Get.offAllNamed('/dashboard'),
-                  ),
+                  if (unconfirmed)
+                    PrimaryButton(
+                      label: 'Return to Dashboard',
+                      onPressed: () => Get.offAllNamed('/dashboard'),
+                    )
+                  else ...[
+                    PrimaryButton(
+                      label: 'Try Again',
+                      onPressed: () => Get.back(),
+                    ),
+                    const SizedBox(height: 12),
+                    GhostButton(
+                      label: 'Return to Dashboard',
+                      onPressed: () => Get.offAllNamed('/dashboard'),
+                    ),
+                  ],
                 ],
               ),
             ),
