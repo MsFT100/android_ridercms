@@ -370,3 +370,54 @@ class UserTransaction {
     );
   }
 }
+
+/// A rider's M-Pesa payment from `GET /booths/payments`.
+class UserPayment {
+  final String sessionType;
+  final String status;
+  final double amount;
+  final DateTime? startedAt;
+  final DateTime? completedAt;
+  final String boothName;
+  final String? receiptNumber;
+  final int? resultCode;
+
+  UserPayment({
+    required this.sessionType,
+    required this.status,
+    required this.amount,
+    this.startedAt,
+    this.completedAt,
+    this.boothName = '',
+    this.receiptNumber,
+    this.resultCode,
+  });
+
+  /// Most relevant timestamp for display.
+  DateTime? get date => completedAt ?? startedAt;
+
+  /// M-Pesa reports ResultCode 0 for a successful charge.
+  bool get isPaid => resultCode == 0;
+
+  /// The STK push failed or was cancelled by the rider.
+  bool get isFailed => resultCode != null && resultCode != 0;
+
+  factory UserPayment.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic value) =>
+        value == null ? null : DateTime.tryParse(value.toString())?.toLocal();
+
+    final dynamic rawAmount = json['amount'];
+    return UserPayment(
+      sessionType: (json['sessionType'] ?? '').toString(),
+      status: (json['status'] ?? '').toString(),
+      amount: rawAmount is num
+          ? rawAmount.toDouble()
+          : double.tryParse(rawAmount?.toString() ?? '') ?? 0,
+      startedAt: parseDate(json['startedAt']),
+      completedAt: parseDate(json['completedAt']),
+      boothName: (json['boothName'] ?? json['boothUid'] ?? '').toString(),
+      receiptNumber: json['receiptNumber']?.toString(),
+      resultCode: int.tryParse(json['resultCode']?.toString() ?? ''),
+    );
+  }
+}

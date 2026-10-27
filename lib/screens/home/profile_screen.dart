@@ -1,13 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:get/get.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../controllers/profile_controller.dart';
-import '../../providers/app_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../utils/enums/enums.dart';
 import '../../utils/themes/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import 'help_support_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -42,38 +43,50 @@ class ProfileScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  Stack(
-                    children: [
-                      Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: kPrimary, width: 2),
-                          image: user?.profileImageUrl != null
-                              ? DecorationImage(
-                                  image: NetworkImage(user!.profileImageUrl!),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: user?.profileImageUrl == null
-                            ? const Icon(Icons.person, size: 50, color: kTextSecondary)
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: kPrimary,
-                            shape: BoxShape.circle,
+                  GestureDetector(
+                    onTap: () => controller.pickAndStoreProfileImage(context),
+                    child: Stack(
+                      children: [
+                        Obx(() {
+                          final localPath = controller.localProfileImagePath.value;
+                          final hasLocal = localPath.isNotEmpty && File(localPath).existsSync();
+                          return Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: kPrimary, width: 2),
+                              image: hasLocal
+                                  ? DecorationImage(
+                                      image: FileImage(File(localPath)),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : (user?.profileImageUrl != null
+                                      ? DecorationImage(
+                                          image: NetworkImage(user!.profileImageUrl!),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null),
+                            ),
+                            child: (!hasLocal && user?.profileImageUrl == null)
+                                ? const Icon(Icons.person, size: 50, color: kTextSecondary)
+                                : null,
+                          );
+                        }),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: kPrimary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.edit, size: 16, color: Colors.white),
                           ),
-                          child: const Icon(Icons.edit, size: 16, color: Colors.white),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -103,34 +116,6 @@ class ProfileScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "ACCOUNT",
-                    style: TextStyle(
-                      color: kTextSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildOptionTile(
-                    icon: Icons.person_outline,
-                    label: "Personal Information",
-                    onTap: () {},
-                  ),
-                  _buildOptionTile(
-                    icon: Icons.account_balance_wallet_outlined,
-                    label: "Payment Methods",
-                    onTap: () {},
-                  ),
-                  _buildOptionTile(
-                    icon: Icons.history,
-                    label: "Transaction History",
-                    // History is a tab: the bare '/history' route has no
-                    // Scaffold or back button.
-                    onTap: () => context.read<AppProvider>().setIndex(2),
-                  ),
-                  const SizedBox(height: 32),
-                  const Text(
                     "SETTINGS",
                     style: TextStyle(
                       color: kTextSecondary,
@@ -141,19 +126,9 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   _buildOptionTile(
-                    icon: Icons.notifications_none,
-                    label: "Notifications",
-                    onTap: () {},
-                  ),
-                  _buildOptionTile(
-                    icon: Icons.security,
-                    label: "Security",
-                    onTap: () {},
-                  ),
-                  _buildOptionTile(
                     icon: Icons.help_outline,
                     label: "Help & Support",
-                    onTap: () {},
+                    onTap: () => Get.to(() => const HelpSupportScreen()),
                   ),
                   const SizedBox(height: 32),
                   

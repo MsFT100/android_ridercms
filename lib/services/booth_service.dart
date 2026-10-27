@@ -391,6 +391,26 @@ class BoothService {
     }
   }
 
+  /// Fetches the rider's M-Pesa payments.
+  Future<List<UserPayment>> getPayments(String token) async {
+    final response = await http
+        .get(
+          Uri.parse('$_baseUrl/booths/payments'),
+          headers: _headers(token),
+        )
+        .timeout(_timeout);
+
+    _ensureSuccess(response, 'Failed to load payments');
+    final data = _decode(response);
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((json) => UserPayment.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    }
+    return [];
+  }
+
   /// Fetches transaction history.
   Future<List<UserTransaction>> getHistory(String token) async {
     try {

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:ridercms/models/booth_models.dart';
 import 'package:ridercms/providers/app_provider.dart';
 import 'package:ridercms/providers/user_provider.dart';
+import 'package:ridercms/screens/home/history_detail_screen.dart';
 import 'package:ridercms/services/booth_service.dart';
 import 'package:ridercms/utils/themes/app_theme.dart';
 
@@ -18,6 +20,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final BoothService _boothService = BoothService();
 
   List<UserTransaction> _items = [];
+  List<UserPayment> _payments = [];
   bool _loading = true;
   String? _error;
 
@@ -38,9 +41,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (token == null) {
         throw BoothApiException('Authentication session expired.');
       }
-      final items = await _boothService.getHistory(token);
+      final results = await Future.wait([
+        _boothService.getHistory(token),
+        _boothService.getPayments(token),
+      ]);
       if (!mounted) return;
-      setState(() => _items = items);
+      setState(() {
+        _items = results[0] as List<UserTransaction>;
+        _payments = results[1] as List<UserPayment>;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -69,47 +78,97 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
     _wasVisible = visible;
 
-    return Container(
-      color: kBgDark,
-      child: Column(
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [kBgDark2, kBgDark],
+    return DefaultTabController(
+      length: 2,
+      child: Container(
+        color: kBgDark,
+        child: Column(
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 64, 24, 16),
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [kBgDark2, kBgDark],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Activity History',
+                    style: TextStyle(
+                      color: kTextPrimary,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Your recent battery swaps and sessions',
+                    style: TextStyle(color: kTextSecondary, fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: kBgCard,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                    ),
+                    child: TabBar(
+                      indicator: BoxDecoration(
+                        color: kPrimary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      labelColor: Colors.white,
+                      unselectedLabelColor: kTextSecondary,
+                      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      tabs: const [
+                        Tab(text: 'Activity'),
+                        Tab(text: 'Payments'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Activity History',
-                  style: TextStyle(
-                    color: kTextPrimary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _buildList<UserTransaction>(
+                    _items,
+                    'No activity yet',
+                    'Your deposits, collections and rentals will appear here.',
+                    (item) => _HistoryTile(item: item),
                   ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Your recent battery swaps and sessions',
-                  style: TextStyle(color: kTextSecondary, fontSize: 14),
-                ),
-              ],
+                  _buildList<UserPayment>(
+                    _payments,
+                    'No payments yet',
+                    'Your payment transactions will appear here.',
+                    (item) => _PaymentTile(item: item),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Expanded(child: _buildBody()),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildList<T>(
+    List<T> items,
+    String emptyTitle,
+    String emptyBody,
+    Widget Function(T item) tileBuilder,
+  ) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: kPrimary));
     }
@@ -118,22 +177,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
       color: kPrimary,
       backgroundColor: kBgCard,
       onRefresh: _load,
-      child: _error != null && _items.isEmpty
+      child: _error != null && items.isEmpty
           ? _message(Icons.error_outline, kDanger, 'Something went wrong', _error!)
-          : _items.isEmpty
+          : items.isEmpty
               ? _message(
                   Icons.history_rounded,
                   kPrimary,
-                  'No activity yet',
-                  'Your deposits, collections and rentals will appear here.',
+                  emptyTitle,
+                  emptyBody,
                 )
               : ListView.separated(
                   physics: const AlwaysScrollableScrollPhysics(),
                   // Leave room for the floating bottom navigation bar.
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
-                  itemCount: _items.length,
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
+                  itemCount: items.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, index) => _HistoryTile(item: _items[index]),
+                  itemBuilder: (_, index) => tileBuilder(items[index]),
                 ),
     );
   }
@@ -236,10 +295,135 @@ class _HistoryTile extends StatelessWidget {
     final statusColor = _statusColor;
     final status = item.status.replaceAll('_', ' ');
 
-    final location = [
-      if (item.boothUid.isNotEmpty) item.boothUid,
-      if (item.slotIdentifier.isNotEmpty) 'Slot ${item.slotIdentifier}',
-    ].join(' · ');
+    return GestureDetector(
+      onTap: () => Get.to(() => HistoryDetailScreen(item: item)),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kBgCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: kTextPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatDate(item.date),
+                    style: const TextStyle(color: kTextSecondary, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (item.amount != null && item.amount! > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      'KES ${item.amount!.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        color: kTextPrimary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    status.isEmpty
+                        ? '—'
+                        : status[0].toUpperCase() + status.substring(1),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentTile extends StatelessWidget {
+  final UserPayment item;
+
+  const _PaymentTile({required this.item});
+
+  static const List<String> _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  String get _label {
+    switch (item.sessionType.toLowerCase()) {
+      case 'withdrawal':
+        return 'Battery Collection';
+      case 'rental':
+        return 'Battery Rental';
+      case 'deposit':
+        return 'Battery Deposit';
+      default:
+        return item.sessionType.isEmpty ? 'Payment' : item.sessionType;
+    }
+  }
+
+  (String, Color) get _statusInfo {
+    if (item.isPaid) return ('Paid', kPrimary);
+    if (item.isFailed) return ('Failed', kDanger);
+    switch (item.status.toLowerCase()) {
+      case 'cancelled':
+      case 'failed':
+        return ('Failed', kDanger);
+      default:
+        return ('Pending', kWarning);
+    }
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return '—';
+    final hh = date.hour.toString().padLeft(2, '0');
+    final mm = date.minute.toString().padLeft(2, '0');
+    return '${date.day} ${_months[date.month - 1]} ${date.year} · $hh:$mm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (statusLabel, statusColor) = _statusInfo;
+    final receipt = item.receiptNumber;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -254,10 +438,10 @@ class _HistoryTile extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.15),
+              color: statusColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color),
+            child: Icon(Icons.payments_rounded, color: statusColor),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -265,7 +449,7 @@ class _HistoryTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
+                  _label,
                   style: const TextStyle(
                     color: kTextPrimary,
                     fontSize: 15,
@@ -277,12 +461,11 @@ class _HistoryTile extends StatelessWidget {
                   _formatDate(item.date),
                   style: const TextStyle(color: kTextSecondary, fontSize: 12),
                 ),
-                if (location.isNotEmpty) ...[
+                if (receipt != null && receipt.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
-                    location,
+                    'M-Pesa $receipt',
                     style: const TextStyle(color: kTextSecondary, fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ],
@@ -292,18 +475,17 @@ class _HistoryTile extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (item.amount != null && item.amount! > 0)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    'KES ${item.amount!.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      color: kTextPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'KES ${item.amount.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    color: kTextPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
+              ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -311,9 +493,7 @@ class _HistoryTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  status.isEmpty
-                      ? '—'
-                      : status[0].toUpperCase() + status.substring(1),
+                  statusLabel,
                   style: TextStyle(
                     color: statusColor,
                     fontSize: 11,
