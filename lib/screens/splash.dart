@@ -79,9 +79,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
       if (hasActiveRental) {
         Get.offAllNamed('/rental');
-      } else if (sessionType == ActiveSessionType.charging) {
-        Get.offAllNamed('/charging');
       } else {
+        // The dashboard is now the single battery surface: it renders the
+        // inline card for one battery and the "Your Batteries" section for
+        // several, so there is no separate charging/multi screen to land on.
         Get.offAllNamed('/dashboard');
       }
     } else {
@@ -122,7 +123,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'RIDERCMS',
+                'MAXTEKHUB',
                 style: TextStyle(
                   color: kTextPrimary,
                   fontSize: 32,

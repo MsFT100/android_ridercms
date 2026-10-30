@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// Ridercms Color Palette
+// Maxtekhub Color Palette
 const Color kPrimary = Color(0xFF00C896);
 const Color kPrimaryDark = Color(0xFF00A87A);
 const Color kAccent = Color(0xFF3B82F6);

@@ -417,7 +417,7 @@ class ChargingController extends GetxController with WidgetsBindingObserver {
 
   void _snack(String message, {bool isError = false}) {
     Get.snackbar(
-      isError ? 'Error' : 'RiderCMS',
+      isError ? 'Error' : 'Maxtekhub',
       message,
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: isError ? Colors.redAccent : null,

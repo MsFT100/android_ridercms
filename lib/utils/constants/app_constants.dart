@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  static const String appName = 'RIDERCMS';
+  static const String appName = 'MAXTEKHUB';
   static const String prodBaseUrl = 'https://ridercmsv1-194585815067.europe-west1.run.app/api';
 
   static const String appVersion = '1.0';

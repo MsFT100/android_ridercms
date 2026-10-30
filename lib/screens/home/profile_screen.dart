@@ -167,7 +167,7 @@ class ProfileScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                "RIDERCMS DEVELOPMENT",
+                                "MAXTEKHUB DEVELOPMENT",
                                 style: TextStyle(
                                   color: kTextSecondary.withValues(alpha: 0.3),
                                   fontSize: 8,

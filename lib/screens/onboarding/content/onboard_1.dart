@@ -36,7 +36,7 @@ class Onboard1 extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         const Text(
-          'Ridercms',
+          'Maxtekhub',
           style: TextStyle(
             color: kPrimary,
             fontSize: 24,
@@ -61,7 +61,7 @@ class Onboard1 extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 32),
           child: Text(
-            'Find Ridercms stations near you and charge your batteries on the go.',
+            'Find Maxtekhub stations near you and charge your batteries on the go.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: kTextSecondary,

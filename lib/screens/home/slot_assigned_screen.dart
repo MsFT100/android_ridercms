@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../controllers/charging_controller.dart';
 import '../../controllers/slot_assigned_controller.dart';
 import '../../utils/rental_launcher.dart';
 import '../../utils/themes/app_theme.dart';
@@ -213,11 +212,7 @@ class SlotAssignedScreen extends StatelessWidget {
                     children: [
                       PrimaryButton(
                         label: 'View Charging Session →',
-                        onPressed: () => Get.offAllNamed(
-                          Get.find<ChargingController>().batteryCount > 1
-                              ? '/batteries'
-                              : '/charging',
-                        ),
+                        onPressed: () => Get.offAllNamed('/dashboard'),
                       ),
                       const SizedBox(height: 12),
                       GhostButton(

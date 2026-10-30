@@ -22,6 +22,20 @@ class LoginController extends GetxController {
     obscurePassword.value = !obscurePassword.value;
   }
 
+  /// Turns `0712 345 678`, `712345678` or `254712345678` into `254712345678`.
+  /// The backend adds the leading "+"; returns null if it isn't a Kenyan mobile number.
+  @visibleForTesting
+  static String? normalizePhone(String input) {
+    var digits = input.replaceAll(RegExp(r'\s'), '');
+    if (digits.startsWith('254')) {
+      digits = digits.substring(3);
+    } else if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+    if (!RegExp(r'^[17]\d{8}$').hasMatch(digits)) return null;
+    return '254$digits';
+  }
+
   Future<void> submit(BuildContext context) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
@@ -45,12 +59,22 @@ class LoginController extends GetxController {
       }
     } else {
       // Sign Up
+      final phone = normalizePhone(phoneCtrl.text);
+      if (phone == null) {
+        CustomSnackBar.show(
+          context,
+          'Enter a valid Kenyan phone number, e.g. 0712 345 678 or 254712345678.',
+          isError: true,
+        );
+        return;
+      }
+
       final result = await userProvider.signUp(
         email: emailCtrl.text.trim(),
         password: passwordCtrl.text.trim(),
         name: nameCtrl.text.trim(),
-        phoneNumber: phoneCtrl.text.trim(),
-        recaptchaToken: "dummy_token", // Replace with real token logic if needed
+        phoneNumber: phone,
+        recaptchaToken: '', // The app is verified by App Check (sent by AuthService), not reCAPTCHA.
       );
 
       if (!context.mounted) return;

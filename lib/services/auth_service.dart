@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -47,9 +48,21 @@ class AuthService {
     required String recaptchaToken,
   }) async {
     try {
+      // The app proves itself with an App Check token instead of a reCAPTCHA token.
+      String? appCheckToken;
+      try {
+        appCheckToken = await FirebaseAppCheck.instance.getToken();
+      } catch (e) {
+        debugPrint('App Check token unavailable: $e');
+      }
+
       final response = await http.post(
         Uri.parse('$_baseUrl/auth/register'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          if (appCheckToken != null && appCheckToken.isNotEmpty)
+            'X-Firebase-AppCheck': appCheckToken,
+        },
         body: json.encode({
           'email': email,
           'password': password,

@@ -40,12 +40,12 @@ class TermsOfServiceScreen extends StatelessWidget {
                     _TermSection(
                       title: '1. Acceptance of Terms',
                       content:
-                          'By accessing or using the Ridercms application, you agree to be bound by these Terms of Service. If you do not agree to all of these terms, do not use the service.',
+                          'By accessing or using the Maxtekhub application, you agree to be bound by these Terms of Service. If you do not agree to all of these terms, do not use the service.',
                     ),
                     _TermSection(
                       title: '2. Description of Service',
                       content:
-                          'Ridercms provides a platform for battery swapping and charging for electric vehicles. We reserve the right to modify or discontinue the service at any time.',
+                          'Maxtekhub provides a platform for battery swapping and charging for electric vehicles. We reserve the right to modify or discontinue the service at any time.',
                     ),
                     _TermSection(
                       title: '3. User Accounts',
@@ -60,7 +60,7 @@ class TermsOfServiceScreen extends StatelessWidget {
                     _TermSection(
                       title: '5. Limitation of Liability',
                       content:
-                          'Ridercms shall not be liable for any direct, indirect, incidental, special, or consequential damages resulting from the use or inability to use the service.',
+                          'Maxtekhub shall not be liable for any direct, indirect, incidental, special, or consequential damages resulting from the use or inability to use the service.',
                     ),
                     SizedBox(height: 32),
                   ],

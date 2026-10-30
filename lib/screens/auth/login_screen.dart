@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:ridercms/controllers/login_controller.dart';
@@ -96,7 +97,7 @@ class LoginScreen extends StatelessWidget {
                       Obx(() => Text(
                         controller.isLogin.value
                             ? 'Sign in to continue charging'
-                            : 'Join Ridercms and start charging',
+                            : 'Join Maxtekhub and start charging',
                         style: const TextStyle(color: kTextSecondary, fontSize: 14),
                       )),
                       const SizedBox(height: 24),
@@ -129,8 +130,15 @@ class LoginScreen extends StatelessWidget {
                             TextField(
                               controller: controller.phoneCtrl,
                               keyboardType: TextInputType.phone,
+                              // Digits and spaces only, so a "+" can't be typed.
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'[0-9 ]')),
+                                LengthLimitingTextInputFormatter(15),
+                              ],
                               style: const TextStyle(color: kTextPrimary),
-                              decoration: const InputDecoration(hintText: '+254 700 000 000'),
+                              decoration: const InputDecoration(
+                                hintText: '0712 345 678 or 254712345678',
+                              ),
                             ),
                             const SizedBox(height: 16),
                           ],

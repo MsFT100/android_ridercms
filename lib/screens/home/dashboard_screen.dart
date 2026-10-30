@@ -11,6 +11,7 @@ import 'package:ridercms/services/booth_service.dart';
 import 'package:ridercms/utils/rental_launcher.dart';
 import 'package:ridercms/utils/themes/app_theme.dart';
 import 'package:ridercms/widgets/custom_snackbar.dart';
+import 'package:ridercms/widgets/home/battery_section.dart';
 
 import '../../widgets/home/quick_action.dart';
 
@@ -30,6 +31,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _checkingRental = false;
   bool _rentalUnavailable = false;
 
+  /// Anchor for the inline "Your Batteries" block so the quick action can
+  /// scroll to it instead of pushing a separate route.
+  final GlobalKey _batteriesKey = GlobalKey();
+
   String _getGreeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) {
@@ -39,6 +44,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else {
       return 'Good evening';
     }
+  }
+
+  /// Scrolls the dashboard feed down to the inline battery cards.
+  void _scrollToBatteries() {
+    final target = _batteriesKey.currentContext;
+    if (target == null) return;
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+      alignment: 0.05,
+    );
   }
 
   @override
@@ -115,7 +132,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final notificationProvider = context.watch<NotificationProvider>();
     final chargingController = _chargingController;
 
-    final userName = userProvider.firebaseUser?.displayName ?? 'RiderCMS';
+    final userName = userProvider.firebaseUser?.displayName ?? 'Rider';
     final unreadCount = notificationProvider.unreadCount;
 
     return Scaffold(
@@ -273,20 +290,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             final int count = chargingController.batteryCount;
                             return QuickAction(
                               icon: Icons.bolt,
-                              title: "Active Session",
+                              title: count == 0 ? "Active Session" : "Your Batteries",
                               subtitle: hasPending
                                   ? "Payment pending"
-                                  : count > 1
-                                      ? "$count batteries"
-                                      : "View charging",
+                                  : count > 0
+                                      ? (count > 1
+                                          ? "$count batteries"
+                                          : "View charging")
+                                      : "Start a session",
                               gradient: const [Color(0xFF2a1a1a), Color(0xFF4a2a1e)],
                               onTap: () {
                                 if (hasPending) {
                                   Get.toNamed('/payment');
-                                } else if (count > 1) {
-                                  Get.toNamed('/batteries');
+                                } else if (count > 0) {
+                                  _scrollToBatteries();
                                 } else {
-                                  Get.toNamed('/charging');
+                                  Get.to(() => const ScanScreen());
                                 }
                               },
                             );
@@ -321,7 +340,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             onTap: () => appProvider.setIndex(2),
                           ),
                         ],
-                      )
+                      ),
+
+                      /// YOUR BATTERIES (inline)
+                      ///
+                      /// The smart part: 1..2 batteries render as full live
+                      /// cards right here, N > 2 renders the first two with a
+                      /// "View all" link to /batteries. No extra tap needed for
+                      /// the common single-battery case.
+                      Obx(() {
+                        final batteries = chargingController.batteries;
+                        if (batteries.isEmpty) return const SizedBox.shrink();
+
+                        final bool hasPending =
+                            chargingController.hasPendingWithdrawal.value;
+                        final bool truncated = batteries.length > 2;
+
+                        return Padding(
+                          key: _batteriesKey,
+                          padding: const EdgeInsets.only(top: 24),
+                          child: BatterySection(
+                            batteries: batteries,
+                            maxCards: 2,
+                            pendingPayment: hasPending,
+                            onPayPending: () => Get.toNamed('/payment'),
+                            onCollect: (index) =>
+                                chargingController.initiateCollection(index: index),
+                            onAddBattery: () =>
+                                Get.to(() => const ScanScreen()),
+                            onViewAll: truncated
+                                ? () => Get.toNamed('/batteries')
+                                : null,
+                          ),
+                        );
+                      }),
                     ],
                   ),
                 ),
